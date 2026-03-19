@@ -21,6 +21,11 @@ import Home from "./pages/Dashboard/Home";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import GuestRoute from "./components/auth/GuestRoute";
 import UserManagement from "./pages/UserManagement";
+import UserDetail from "./pages/UserDetail";
+import ContentManagement from "./pages/ContentManagement";
+import SupportManagement from "./pages/SupportManagement";
+import FaqManagement from "./pages/FaqManagement";
+import WebinarRegistrations from "./pages/WebinarRegistrations";
 
 export default function App() {
   return (
@@ -63,6 +68,15 @@ export default function App() {
 
             {/* User Management */}
             <Route path="/users" element={<UserManagement />} />
+            <Route path="/users/:id" element={<UserDetail />} />
+
+            {/* Content (Vision & Mission) */}
+            <Route path="/content" element={<ContentManagement />} />
+
+            {/* Support & FAQ */}
+            <Route path="/support" element={<SupportManagement />} />
+            <Route path="/faq" element={<FaqManagement />} />
+            <Route path="/webinar" element={<WebinarRegistrations />} />
           </Route>
 
           {/* Auth — guest only */}

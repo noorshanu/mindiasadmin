@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router";
 import PageMeta from "../components/common/PageMeta";
 import {
   fetchUsers,
@@ -25,6 +26,8 @@ export default function UserManagement() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editRoleId, setEditRoleId] = useState<string | null>(null);
   const [editRole, setEditRole] = useState<"user" | "admin">("user");
+  const [roleFilter, setRoleFilter] = useState<"all" | "user" | "admin">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -57,6 +60,16 @@ export default function UserManagement() {
     setSearch(searchInput.trim());
     setPagination((prev) => ({ ...prev, page: 1 }));
   };
+
+  const filteredUsers = useMemo(() => {
+    return users.filter((u) => {
+      if (roleFilter !== "all" && u.role !== roleFilter) return false;
+      const isActive = u.isActive !== false;
+      if (statusFilter === "active" && !isActive) return false;
+      if (statusFilter === "inactive" && isActive) return false;
+      return true;
+    });
+  }, [users, roleFilter, statusFilter]);
 
   const handleUpdateRole = async (id: string) => {
     if (!editRoleId || editRoleId !== id) return;
@@ -99,18 +112,42 @@ export default function UserManagement() {
           <h1 className="text-xl font-semibold text-gray-800 dark:text-white/90">
             User Management
           </h1>
-          <form onSubmit={handleSearch} className="flex gap-2">
-            <Input
-              type="text"
-              placeholder="Search by email, username, phone..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="min-w-[200px]"
-            />
-            <Button type="submit" size="sm">
-              Search
-            </Button>
-          </form>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <form onSubmit={handleSearch} className="flex gap-2">
+              <Input
+                type="text"
+                placeholder="Search by email, username, phone..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="min-w-[220px]"
+              />
+              <Button type="submit" size="sm">
+                Search
+              </Button>
+            </form>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={roleFilter}
+                onChange={(e) => setRoleFilter(e.target.value as "all" | "user" | "admin")}
+                className="h-9 rounded border border-gray-300 bg-white px-2 text-sm text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+              >
+                <option value="all">All roles</option>
+                <option value="user">Users only</option>
+                <option value="admin">Admins only</option>
+              </select>
+              <select
+                value={statusFilter}
+                onChange={(e) =>
+                  setStatusFilter(e.target.value as "all" | "active" | "inactive")
+                }
+                className="h-9 rounded border border-gray-300 bg-white px-2 text-sm text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+              >
+                <option value="all">All status</option>
+                <option value="active">Active only</option>
+                <option value="inactive">Inactive only</option>
+              </select>
+            </div>
+          </div>
         </div>
 
         {error && (
@@ -124,7 +161,7 @@ export default function UserManagement() {
             <div className="p-8 text-center text-gray-500 dark:text-gray-400">
               Loading users...
             </div>
-          ) : users.length === 0 ? (
+          ) : filteredUsers.length === 0 ? (
             <div className="p-8 text-center text-gray-500 dark:text-gray-400">
               No users found.
             </div>
@@ -142,13 +179,20 @@ export default function UserManagement() {
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map((user) => (
+                  {filteredUsers.map((user) => (
                     <tr
                       key={user._id}
                       className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50"
                     >
                       <td className="px-4 py-3">{user.email || "—"}</td>
-                      <td className="px-4 py-3">{user.username || "—"}</td>
+                      <td className="px-4 py-3">
+                        <Link
+                          to={`/users/${user._id}`}
+                          className="text-brand-500 hover:text-brand-600 font-medium hover:underline"
+                        >
+                          {user.username || user.email || user.phone || user._id}
+                        </Link>
+                      </td>
                       <td className="px-4 py-3">{user.phone || "—"}</td>
                       <td className="px-4 py-3">
                         {editRoleId === user._id ? (
