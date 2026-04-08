@@ -6,10 +6,16 @@ import {
   fetchUser,
   fetchUserSessions,
   fetchUserSupport,
+  fetchUserMoodLogs,
+  fetchUserJournalEntries,
+  fetchUserActivityHistory,
   updateUser,
   type AdminUser,
   type AdminChatSession,
   type SupportMessage,
+  type MoodLogRow,
+  type UserJournalEntryRow,
+  type UserActivityHistoryRow,
 } from "../lib/api";
 
 export default function UserDetail() {
@@ -17,6 +23,9 @@ export default function UserDetail() {
   const [user, setUser] = useState<AdminUser | null>(null);
   const [sessions, setSessions] = useState<AdminChatSession[]>([]);
   const [support, setSupport] = useState<SupportMessage[]>([]);
+  const [moodLogs, setMoodLogs] = useState<MoodLogRow[]>([]);
+  const [journalEntries, setJournalEntries] = useState<UserJournalEntryRow[]>([]);
+  const [activityHistory, setActivityHistory] = useState<UserActivityHistoryRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [togglingActive, setTogglingActive] = useState(false);
@@ -31,10 +40,13 @@ export default function UserDetail() {
     setLoading(true);
     setError(null);
     try {
-      const [userRes, sessionsRes, supportRes] = await Promise.all([
+      const [userRes, sessionsRes, supportRes, moodRes, journalRes, activityRes] = await Promise.all([
         fetchUser(id),
         fetchUserSessions(id),
         fetchUserSupport(id),
+        fetchUserMoodLogs(id, { limit: 200 }),
+        fetchUserJournalEntries(id, { limit: 100 }),
+        fetchUserActivityHistory(id, { limit: 120 }),
       ]);
       setUser(userRes.data);
       setEditEmail(userRes.data.email || "");
@@ -42,6 +54,9 @@ export default function UserDetail() {
       setEditRole(userRes.data.role);
       setSessions(sessionsRes.data);
       setSupport(supportRes.data);
+      setMoodLogs(moodRes.data);
+      setJournalEntries(journalRes.data);
+      setActivityHistory(activityRes.data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load user");
     } finally {
@@ -328,6 +343,110 @@ export default function UserDetail() {
                       ))}
                     </div>
                   )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Mood logs (3 slots per day: morning, afternoon, evening) */}
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] lg:p-6">
+          <h3 className="mb-4 text-lg font-semibold text-gray-800 dark:text-white/90">Mood logs</h3>
+          <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
+            Up to three entries per calendar day — morning, afternoon, and evening — as recorded in the app.
+          </p>
+          {moodLogs.length === 0 ? (
+            <p className="text-sm text-gray-500 dark:text-gray-400">No mood logs yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400">
+                    <th className="py-2 pr-4 font-medium">Date</th>
+                    <th className="py-2 pr-4 font-medium">Period</th>
+                    <th className="py-2 pr-4 font-medium">Mood</th>
+                    <th className="py-2 font-medium">Updated</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {moodLogs.map((row) => (
+                    <tr
+                      key={row._id}
+                      className="border-b border-gray-100 dark:border-gray-800 text-gray-800 dark:text-white/90"
+                    >
+                      <td className="py-2 pr-4 whitespace-nowrap">{row.dateKey}</td>
+                      <td className="py-2 pr-4 capitalize">{row.period}</td>
+                      <td className="py-2 pr-4">{row.mood}</td>
+                      <td className="py-2 text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                        {row.updatedAt ? new Date(row.updatedAt).toLocaleString() : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Journal entries (free-form text + mood from app) */}
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] lg:p-6">
+          <h3 className="mb-4 text-lg font-semibold text-gray-800 dark:text-white/90">Journal entries</h3>
+          <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
+            Text journal posts the user saved from the app (mood + note).
+          </p>
+          {journalEntries.length === 0 ? (
+            <p className="text-sm text-gray-500 dark:text-gray-400">No journal entries yet.</p>
+          ) : (
+            <div className="space-y-3 max-h-[480px] overflow-y-auto">
+              {journalEntries.map((row) => (
+                <div
+                  key={row._id}
+                  className="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/40"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                      {row.createdAt ? new Date(row.createdAt).toLocaleString() : "—"}
+                    </span>
+                    <span className="rounded-full border border-gray-200 bg-white px-2.5 py-0.5 text-xs font-medium capitalize text-gray-800 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200">
+                      {row.mood}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                    {row.text}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+
+        {/* Activity history (fast relief / breathing / etc) */}
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] lg:p-6">
+          <h3 className="mb-4 text-lg font-semibold text-gray-800 dark:text-white/90">Activity history</h3>
+          <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
+            App activity sessions such as guided breathing and other fast-relief tools.
+          </p>
+          {activityHistory.length === 0 ? (
+            <p className="text-sm text-gray-500 dark:text-gray-400">No activity history yet.</p>
+          ) : (
+            <div className="space-y-3 max-h-[420px] overflow-y-auto">
+              {activityHistory.map((row) => (
+                <div
+                  key={row._id}
+                  className="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/40"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-medium text-gray-800 dark:text-white/90">{row.title}</span>
+                    <span className="rounded-full border border-gray-200 bg-white px-2.5 py-0.5 text-xs font-medium text-gray-700 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200">
+                      {row.completed ? "Completed" : "Stopped"}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-4 text-xs text-gray-500 dark:text-gray-400">
+                    <span>Type: {row.activityType}</span>
+                    <span>Duration: {typeof row.durationSec === "number" ? `${row.durationSec}s` : "—"}</span>
+                    <span>{row.createdAt ? new Date(row.createdAt).toLocaleString() : ""}</span>
+                  </div>
                 </div>
               ))}
             </div>

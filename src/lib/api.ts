@@ -1,5 +1,58 @@
-//const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:4000";
+//const API_BASE ="http://localhost:4000";
 const API_BASE = "https://api.mindsai.live";
+
+/**
+ * API wraps JSON as `{ success, message, data }`. Nested objects are merged up; arrays stay under `data`.
+ */
+function unwrapBackendSuccess(raw: unknown): Record<string, unknown> {
+  if (!raw || typeof raw !== "object") return raw as Record<string, unknown>;
+  const o = raw as { success?: boolean; data?: unknown } & Record<string, unknown>;
+  if (o.success !== true || o.data === null || o.data === undefined) {
+    return o as Record<string, unknown>;
+  }
+  if (Array.isArray(o.data)) {
+    return o as Record<string, unknown>;
+  }
+  if (typeof o.data === "object") {
+    return { ...o, ...(o.data as Record<string, unknown>) } as Record<string, unknown>;
+  }
+  return o as Record<string, unknown>;
+}
+
+function throwIfFailed(res: Response, raw: unknown): void {
+  if (res.ok) return;
+  const o = raw as { message?: string; error?: string };
+  throw new Error(o.message || o.error || `Request failed (${res.status})`);
+}
+
+type PaginationMeta = {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+};
+
+function readPaginatedRows(flat: Record<string, unknown>): {
+  rows: unknown[];
+  pagination: PaginationMeta;
+} {
+  const rows = Array.isArray(flat.items)
+    ? flat.items
+    : Array.isArray(flat.data)
+      ? flat.data
+      : [];
+  const pagination = flat.pagination as PaginationMeta | undefined;
+  if (!pagination) {
+    throw new Error("Invalid API response: missing pagination");
+  }
+  return { rows, pagination };
+}
+
+function readArrayData(flat: Record<string, unknown>): unknown[] {
+  if (Array.isArray(flat.items)) return flat.items;
+  if (Array.isArray(flat.data)) return flat.data;
+  return [];
+}
 
 function getToken(): string | null {
   return localStorage.getItem("admin_token");
@@ -52,9 +105,20 @@ export async function adminLogin(email: string, password: string) {
     headers: getHeaders(false),
     body: JSON.stringify({ email, password }),
   });
-  const data = (await res.json()) as { message?: string; error?: string };
-  if (!res.ok) throw new Error(data.error || data.message || "Login failed");
-  return data as { success: true; token: string; user: AdminUser };
+  const raw = await res.json();
+  if (!res.ok) {
+    const err = raw as { message?: string; error?: string };
+    throw new Error(err.message || err.error || "Login failed");
+  }
+  const flat = unwrapBackendSuccess(raw);
+  if (!flat.token || !flat.user) {
+    throw new Error("Invalid login response from server");
+  }
+  return {
+    success: true as const,
+    token: flat.token as string,
+    user: flat.user as AdminUser,
+  };
 }
 
 export async function adminSignup(email: string, password: string, name?: string) {
@@ -63,18 +127,36 @@ export async function adminSignup(email: string, password: string, name?: string
     headers: getHeaders(false),
     body: JSON.stringify({ email, password, name }),
   });
-  const data = (await res.json()) as { message?: string; error?: string };
-  if (!res.ok) throw new Error(data.error || data.message || "Signup failed");
-  return data as { success: true; token: string; user: AdminUser };
+  const raw = await res.json();
+  if (!res.ok) {
+    const err = raw as { message?: string; error?: string };
+    throw new Error(err.message || err.error || "Signup failed");
+  }
+  const flat = unwrapBackendSuccess(raw);
+  if (!flat.token || !flat.user) {
+    throw new Error("Invalid signup response from server");
+  }
+  return {
+    success: true as const,
+    token: flat.token as string,
+    user: flat.user as AdminUser,
+  };
 }
 
 export async function adminMe() {
   const res = await fetch(`${API_BASE}/api/admin/auth/me`, {
     headers: getHeaders(true),
   });
-  const data = (await res.json()) as { message?: string; error?: string };
-  if (!res.ok) throw new Error(data.error || data.message || "Not authenticated");
-  return data as { success: true; user: AdminUser };
+  const raw = await res.json();
+  if (!res.ok) {
+    const err = raw as { message?: string; error?: string };
+    throw new Error(err.message || err.error || "Not authenticated");
+  }
+  const flat = unwrapBackendSuccess(raw);
+  if (!flat.user) {
+    throw new Error("Invalid /me response from server");
+  }
+  return { success: true as const, user: flat.user as AdminUser };
 }
 
 // ——— User Management —————————————————————————————————───────────────────
@@ -87,34 +169,108 @@ export async function fetchUsers(params?: { page?: number; limit?: number; searc
   const qs = sp.toString();
   const url = `${API_BASE}/api/admin/users${qs ? `?${qs}` : ""}`;
   const res = await fetch(url, { headers: getHeaders(true) });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || "Failed to fetch users");
-  return data as {
-    success: true;
-    data: AdminUser[];
-    pagination: { page: number; limit: number; total: number; totalPages: number };
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const { rows, pagination } = readPaginatedRows(unwrapBackendSuccess(raw));
+  return {
+    success: true as const,
+    data: rows as AdminUser[],
+    pagination,
   };
 }
 
 export async function fetchUser(id: string) {
   const res = await fetch(`${API_BASE}/api/admin/users/${id}`, { headers: getHeaders(true) });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || "Failed to fetch user");
-  return data as { success: true; data: AdminUser };
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  const user = flat.data as AdminUser;
+  if (!user) throw new Error("Failed to fetch user");
+  return { success: true as const, data: user };
 }
 
 export async function fetchUserSessions(userId: string) {
   const res = await fetch(`${API_BASE}/api/admin/users/${userId}/sessions`, { headers: getHeaders(true) });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || "Failed to fetch chat sessions");
-  return data as { success: true; data: AdminChatSession[] };
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const sessions = readArrayData(unwrapBackendSuccess(raw)) as AdminChatSession[];
+  return { success: true as const, data: sessions };
 }
 
 export async function fetchUserSupport(userId: string) {
   const res = await fetch(`${API_BASE}/api/admin/users/${userId}/support`, { headers: getHeaders(true) });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || "Failed to fetch support messages");
-  return data as { success: true; data: SupportMessage[] };
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const messages = readArrayData(unwrapBackendSuccess(raw)) as SupportMessage[];
+  return { success: true as const, data: messages };
+}
+
+export type MoodLogRow = {
+  _id: string;
+  dateKey: string;
+  period: "morning" | "afternoon" | "evening";
+  mood: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export async function fetchUserMoodLogs(userId: string, params?: { limit?: number }) {
+  const sp = new URLSearchParams();
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  const qs = sp.toString();
+  const url = `${API_BASE}/api/admin/users/${userId}/mood-logs${qs ? `?${qs}` : ""}`;
+  const res = await fetch(url, { headers: getHeaders(true) });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  const rows = Array.isArray(flat.data) ? (flat.data as MoodLogRow[]) : [];
+  return { success: true as const, data: rows };
+}
+
+export type UserJournalEntryRow = {
+  _id: string;
+  mood: string;
+  text: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export async function fetchUserJournalEntries(userId: string, params?: { limit?: number }) {
+  const sp = new URLSearchParams();
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  const qs = sp.toString();
+  const url = `${API_BASE}/api/admin/users/${userId}/journal-entries${qs ? `?${qs}` : ""}`;
+  const res = await fetch(url, { headers: getHeaders(true) });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  const rows = Array.isArray(flat.data) ? (flat.data as UserJournalEntryRow[]) : [];
+  return { success: true as const, data: rows };
+}
+
+
+export type UserActivityHistoryRow = {
+  _id: string;
+  activityType: string;
+  title: string;
+  durationSec?: number | null;
+  completed: boolean;
+  metadata?: Record<string, unknown> | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export async function fetchUserActivityHistory(userId: string, params?: { limit?: number }) {
+  const sp = new URLSearchParams();
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  const qs = sp.toString();
+  const url = `${API_BASE}/api/admin/users/${userId}/activity-history${qs ? `?${qs}` : ""}`;
+  const res = await fetch(url, { headers: getHeaders(true) });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  const rows = Array.isArray(flat.data) ? (flat.data as UserActivityHistoryRow[]) : [];
+  return { success: true as const, data: rows };
 }
 
 export async function updateUser(
@@ -126,9 +282,12 @@ export async function updateUser(
     headers: getHeaders(true),
     body: JSON.stringify(body),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || "Failed to update user");
-  return data as { success: true; data: AdminUser };
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  const user = flat.data as AdminUser;
+  if (!user) throw new Error("Failed to update user");
+  return { success: true as const, data: user };
 }
 
 export async function deleteUser(id: string) {
@@ -136,33 +295,131 @@ export async function deleteUser(id: string) {
     method: "DELETE",
     headers: getHeaders(true),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || "Failed to delete user");
-  return data;
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  return unwrapBackendSuccess(raw);
 }
 
-// ——— Content (Vision & Mission) —————————————————————————————————──────────
+// ——— Content (Vision & Mission) —————————————————————————————————────────——
 
 export type ContentData = { vision: string; mission: string };
+
+export type HomeHeroSlide = {
+  _id: string;
+  imageUrl: string;
+  alt: string;
+  order: number;
+};
+
+function parseHomeHeroSlides(raw: unknown): HomeHeroSlide[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const o = item as Record<string, unknown>;
+      const _id = o["_id"];
+      const imageUrl = o["imageUrl"];
+      if (typeof _id !== "string" || typeof imageUrl !== "string") return null;
+      return {
+        _id,
+        imageUrl,
+        alt: typeof o["alt"] === "string" ? o["alt"] : "",
+        order: typeof o["order"] === "number" ? o["order"] : 0,
+      };
+    })
+    .filter((x): x is HomeHeroSlide => x != null)
+    .sort((a, b) => a.order - b.order);
+}
 
 export async function fetchContent() {
   const res = await fetch(`${API_BASE}/api/admin/content`, {
     headers: getHeaders(true),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error((data as { message?: string; error?: string }).message || (data as { error?: string }).error || "Failed to fetch content");
-  return data as { success: true; vision: string; mission: string };
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  return {
+    success: true as const,
+    vision: String(flat.vision ?? ""),
+    mission: String(flat.mission ?? ""),
+    thought: String(flat.thought ?? ""),
+    homeHeroSlides: parseHomeHeroSlides(flat.homeHeroSlides),
+  };
 }
 
-export async function updateContent(body: { vision?: string; mission?: string }) {
+export async function updateContent(body: {
+  vision?: string;
+  mission?: string;
+  thought?: string;
+}) {
   const res = await fetch(`${API_BASE}/api/admin/content`, {
     method: "PUT",
     headers: getHeaders(true),
     body: JSON.stringify(body),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error((data as { message?: string; error?: string }).message || (data as { error?: string }).error || "Failed to update content");
-  return data as { success: true; vision: string; mission: string };
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  return {
+    success: true as const,
+    vision: String(flat.vision ?? ""),
+    mission: String(flat.mission ?? ""),
+    thought: String(flat.thought ?? ""),
+    homeHeroSlides: parseHomeHeroSlides(flat.homeHeroSlides),
+  };
+}
+
+/** Multipart field `image`; optional `alt` text field. */
+export async function uploadHomeHeroSlide(file: File, alt?: string) {
+  const formData = new FormData();
+  formData.append("image", file);
+  if (alt != null && alt.trim()) formData.append("alt", alt.trim());
+  const token = getToken();
+  const headers: HeadersInit = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(`${API_BASE}/api/admin/content/home-hero-slide`, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  return {
+    success: true as const,
+    homeHeroSlides: parseHomeHeroSlides(flat.homeHeroSlides),
+    slide: (() => {
+      const s = flat.slide;
+      if (!s || typeof s !== "object") return null;
+      const o = s as Record<string, unknown>;
+      const _id = o["_id"];
+      const imageUrl = o["imageUrl"];
+      if (typeof _id !== "string" || typeof imageUrl !== "string") return null;
+      return {
+        _id,
+        imageUrl,
+        alt: typeof o["alt"] === "string" ? o["alt"] : "",
+        order: typeof o["order"] === "number" ? o["order"] : 0,
+      } satisfies HomeHeroSlide;
+    })(),
+  };
+}
+
+export async function deleteHomeHeroSlide(slideId: string) {
+  const res = await fetch(
+    `${API_BASE}/api/admin/content/home-hero-slide/${encodeURIComponent(slideId)}`,
+    {
+      method: "DELETE",
+      headers: getHeaders(true),
+    },
+  );
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  return {
+    success: true as const,
+    homeHeroSlides: parseHomeHeroSlides(flat.homeHeroSlides),
+  };
 }
 
 // ——— Social (links + office info) —————————————————————————————————────────
@@ -180,14 +437,18 @@ export async function fetchSocial() {
   const res = await fetch(`${API_BASE}/api/admin/social`, {
     headers: getHeaders(true),
   });
-  const data = await res.json();
-  if (!res.ok)
-    throw new Error(
-      (data as { message?: string; error?: string }).message ||
-        (data as { error?: string }).error ||
-        "Failed to fetch social settings",
-    );
-  return data as { success: true; data: SocialSettings };
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  const data = (flat.data as SocialSettings) ?? {
+    facebookUrl: String(flat.facebookUrl ?? ""),
+    twitterUrl: String(flat.twitterUrl ?? ""),
+    instagramUrl: String(flat.instagramUrl ?? ""),
+    linkedinUrl: String(flat.linkedinUrl ?? ""),
+    address: String(flat.address ?? ""),
+    businessHours: String(flat.businessHours ?? ""),
+  };
+  return { success: true as const, data };
 }
 
 export async function updateSocial(body: SocialSettings) {
@@ -196,14 +457,18 @@ export async function updateSocial(body: SocialSettings) {
     headers: getHeaders(true),
     body: JSON.stringify(body),
   });
-  const data = await res.json();
-  if (!res.ok)
-    throw new Error(
-      (data as { message?: string; error?: string }).message ||
-        (data as { error?: string }).error ||
-        "Failed to update social settings",
-    );
-  return data as { success: true; data: SocialSettings };
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  const data = (flat.data as SocialSettings) ?? {
+    facebookUrl: String(flat.facebookUrl ?? ""),
+    twitterUrl: String(flat.twitterUrl ?? ""),
+    instagramUrl: String(flat.instagramUrl ?? ""),
+    linkedinUrl: String(flat.linkedinUrl ?? ""),
+    address: String(flat.address ?? ""),
+    businessHours: String(flat.businessHours ?? ""),
+  };
+  return { success: true as const, data };
 }
 
 // ——— Team (Our Team) —————————————————————————————————────────────────────
@@ -212,9 +477,10 @@ export type TeamMember = { _id: string; name: string; title: string; imageUrl?: 
 
 export async function fetchTeam() {
   const res = await fetch(`${API_BASE}/api/admin/team`, { headers: getHeaders(true) });
-  const data = await res.json();
-  if (!res.ok) throw new Error((data as { message?: string; error?: string }).message || (data as { error?: string }).error || "Failed to fetch team");
-  return data as { success: true; data: TeamMember[] };
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const list = readArrayData(unwrapBackendSuccess(raw)) as TeamMember[];
+  return { success: true as const, data: list };
 }
 
 export async function addTeamMember(body: { name: string; title: string; imageUrl?: string }) {
@@ -223,9 +489,12 @@ export async function addTeamMember(body: { name: string; title: string; imageUr
     headers: getHeaders(true),
     body: JSON.stringify(body),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error((data as { message?: string; error?: string }).message || (data as { error?: string }).error || "Failed to add team member");
-  return data as { success: true; data: TeamMember };
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  const member = flat.data as TeamMember;
+  if (!member) throw new Error("Failed to add team member");
+  return { success: true as const, data: member };
 }
 
 export async function updateTeamMember(id: string, body: { name?: string; title?: string }) {
@@ -234,9 +503,12 @@ export async function updateTeamMember(id: string, body: { name?: string; title?
     headers: getHeaders(true),
     body: JSON.stringify(body),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error((data as { message?: string; error?: string }).message || (data as { error?: string }).error || "Failed to update team member");
-  return data as { success: true; data: TeamMember };
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  const member = flat.data as TeamMember;
+  if (!member) throw new Error("Failed to update team member");
+  return { success: true as const, data: member };
 }
 
 export async function uploadTeamMemberImage(id: string, file: File) {
@@ -250,9 +522,16 @@ export async function uploadTeamMemberImage(id: string, file: File) {
     headers,
     body: formData,
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error((data as { message?: string; error?: string }).message || (data as { error?: string }).error || "Failed to upload image");
-  return data as { success: true; imageUrl: string; data: TeamMember };
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  const member = flat.data as TeamMember;
+  if (!member || !flat.imageUrl) throw new Error("Failed to upload image");
+  return {
+    success: true as const,
+    imageUrl: flat.imageUrl as string,
+    data: member,
+  };
 }
 
 export async function deleteTeamMember(id: string) {
@@ -260,9 +539,9 @@ export async function deleteTeamMember(id: string) {
     method: "DELETE",
     headers: getHeaders(true),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error((data as { message?: string; error?: string }).message || (data as { error?: string }).error || "Failed to delete team member");
-  return data;
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  return unwrapBackendSuccess(raw);
 }
 
 // ——— Support Messages —————————————————————————————————───────────────────
@@ -289,12 +568,13 @@ export async function fetchSupportMessages(params?: {
   const qs = sp.toString();
   const url = `${API_BASE}/api/admin/support${qs ? `?${qs}` : ""}`;
   const res = await fetch(url, { headers: getHeaders(true) });
-  const data = await res.json();
-  if (!res.ok) throw new Error((data as { message?: string; error?: string }).message || (data as { error?: string }).error || "Failed to fetch support messages");
-  return data as {
-    success: true;
-    data: SupportMessage[];
-    pagination: { page: number; limit: number; total: number; totalPages: number };
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const { rows, pagination } = readPaginatedRows(unwrapBackendSuccess(raw));
+  return {
+    success: true as const,
+    data: rows as SupportMessage[],
+    pagination,
   };
 }
 
@@ -304,9 +584,12 @@ export async function updateSupportMessageStatus(id: string, status: "pending" |
     headers: getHeaders(true),
     body: JSON.stringify({ status }),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error((data as { message?: string; error?: string }).message || (data as { error?: string }).error || "Failed to update");
-  return data as { success: true; data: SupportMessage };
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  const doc = flat.data as SupportMessage;
+  if (!doc) throw new Error("Failed to update");
+  return { success: true as const, data: doc };
 }
 
 // ——— Webinar Registrations ————————————————————————————————————————————————
@@ -326,7 +609,9 @@ export type WebinarRegistration = {
   joinEarlyCommunity: "yes" | "no";
   consentUpdates: boolean;
   packageId: "basic" | "pro" | "premium";
+  couponCode?: string;
   packageAmountPaise: number;
+  packageOriginalAmountPaise?: number;
   message?: string;
   razorpayOrderId?: string;
   razorpayPaymentId?: string;
@@ -351,17 +636,13 @@ export async function fetchWebinarRegistrations(params?: {
   const qs = sp.toString();
   const url = `${API_BASE}/api/admin/webinar${qs ? `?${qs}` : ""}`;
   const res = await fetch(url, { headers: getHeaders(true) });
-  const data = await res.json();
-  if (!res.ok)
-    throw new Error(
-      (data as { message?: string; error?: string }).message ||
-        (data as { error?: string }).error ||
-        "Failed to fetch webinar registrations",
-    );
-  return data as {
-    success: true;
-    data: WebinarRegistration[];
-    pagination: { page: number; limit: number; total: number; totalPages: number };
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const { rows, pagination } = readPaginatedRows(unwrapBackendSuccess(raw));
+  return {
+    success: true as const,
+    data: rows as WebinarRegistration[],
+    pagination,
   };
 }
 
@@ -387,18 +668,68 @@ export type WebinarPackage = {
   active: boolean;
 };
 
+export type WebinarCoupon = {
+  code: string;
+  active: boolean;
+  amountPaiseByPackage: Partial<Record<"basic" | "pro" | "premium", number>>;
+  maxUses?: number;
+  usedCount: number;
+  expiresAt?: string | null;
+};
+
+export async function fetchWebinarCoupons() {
+  const res = await fetch(`${API_BASE}/api/admin/webinar-coupons`, { headers: getHeaders(true) });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  const coupons = (flat.coupons ?? flat.data) as WebinarCoupon[];
+  if (!Array.isArray(coupons)) throw new Error("Failed to fetch webinar coupons");
+  return { success: true as const, coupons };
+}
+
+export async function upsertWebinarCoupon(body: {
+  code: string;
+  active: boolean;
+  amountPaiseByPackage: Partial<Record<"basic" | "pro" | "premium", number>>;
+  maxUses?: number;
+  expiresAt?: string | null;
+}) {
+  const res = await fetch(`${API_BASE}/api/admin/webinar-coupons`, {
+    method: "PUT",
+    headers: getHeaders(true),
+    body: JSON.stringify(body),
+  });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  const coupon = flat.coupon as WebinarCoupon;
+  if (!coupon) throw new Error("Failed to save webinar coupon");
+  return { success: true as const, coupon };
+}
+
+export async function deleteWebinarCoupon(code: string) {
+  const res = await fetch(`${API_BASE}/api/admin/webinar-coupons/${encodeURIComponent(code)}`, {
+    method: "DELETE",
+    headers: getHeaders(true),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok)
+    throw new Error((data as { message?: string; error?: string }).message || (data as { error?: string }).error || "Failed to delete webinar coupon");
+  return data as { success: true };
+}
+
 export async function fetchWebinarPackages() {
   const res = await fetch(`${API_BASE}/api/admin/webinar-settings/packages`, {
     headers: getHeaders(true),
   });
-  const data = await res.json();
-  if (!res.ok)
-    throw new Error(
-      (data as { message?: string; error?: string }).message ||
-        (data as { error?: string }).error ||
-        "Failed to fetch webinar packages",
-    );
-  return data as { success: true; currency: string; packages: WebinarPackage[] };
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  return {
+    success: true as const,
+    currency: String(flat.currency ?? "INR"),
+    packages: flat.packages as WebinarPackage[],
+  };
 }
 
 export async function updateWebinarPackages(packages: WebinarPackage[]) {
@@ -407,14 +738,14 @@ export async function updateWebinarPackages(packages: WebinarPackage[]) {
     headers: getHeaders(true),
     body: JSON.stringify({ packages }),
   });
-  const data = await res.json();
-  if (!res.ok)
-    throw new Error(
-      (data as { message?: string; error?: string }).message ||
-        (data as { error?: string }).error ||
-        "Failed to update webinar packages",
-    );
-  return data as { success: true; currency: string; packages: WebinarPackage[] };
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  return {
+    success: true as const,
+    currency: String(flat.currency ?? "INR"),
+    packages: flat.packages as WebinarPackage[],
+  };
 }
 
 // ——— FAQ —————————————————————————————————────────────────────────────────
@@ -423,9 +754,10 @@ export type FAQItem = { _id: string; question: string; answer: string; order: nu
 
 export async function fetchFaqs() {
   const res = await fetch(`${API_BASE}/api/admin/faq`, { headers: getHeaders(true) });
-  const data = await res.json();
-  if (!res.ok) throw new Error((data as { message?: string; error?: string }).message || (data as { error?: string }).error || "Failed to fetch FAQs");
-  return data as { success: true; data: FAQItem[] };
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const list = readArrayData(unwrapBackendSuccess(raw)) as FAQItem[];
+  return { success: true as const, data: list };
 }
 
 export async function addFaq(body: { question: string; answer: string; order?: number }) {
@@ -434,9 +766,12 @@ export async function addFaq(body: { question: string; answer: string; order?: n
     headers: getHeaders(true),
     body: JSON.stringify(body),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error((data as { message?: string; error?: string }).message || (data as { error?: string }).error || "Failed to add FAQ");
-  return data as { success: true; data: FAQItem };
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  const doc = flat.data as FAQItem;
+  if (!doc) throw new Error("Failed to add FAQ");
+  return { success: true as const, data: doc };
 }
 
 export async function updateFaq(id: string, body: { question?: string; answer?: string; order?: number }) {
@@ -445,9 +780,12 @@ export async function updateFaq(id: string, body: { question?: string; answer?: 
     headers: getHeaders(true),
     body: JSON.stringify(body),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error((data as { message?: string; error?: string }).message || (data as { error?: string }).error || "Failed to update FAQ");
-  return data as { success: true; data: FAQItem };
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  const doc = flat.data as FAQItem;
+  if (!doc) throw new Error("Failed to update FAQ");
+  return { success: true as const, data: doc };
 }
 
 export async function deleteFaq(id: string) {
@@ -455,7 +793,71 @@ export async function deleteFaq(id: string) {
     method: "DELETE",
     headers: getHeaders(true),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error((data as { message?: string; error?: string }).message || (data as { error?: string }).error || "Failed to delete FAQ");
-  return data;
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  return unwrapBackendSuccess(raw);
+}
+
+// ——— Push notifications (FCM) ————————————————————————————————————————————
+
+/** One admin “send to all” action (not per-recipient). */
+export type PushBroadcastRow = {
+  _id: string;
+  title: string;
+  body: string;
+  data?: Record<string, unknown>;
+  sentByAdminId: string;
+  targeted: number;
+  sent: number;
+  failed: number;
+  skipped: number;
+  createdAt: string;
+  updatedAt?: string;
+};
+
+export async function sendAdminPush(body: {
+  title: string;
+  body: string;
+  data?: Record<string, unknown>;
+}) {
+  const res = await fetch(`${API_BASE}/api/admin/notifications/send`, {
+    method: "POST",
+    headers: getHeaders(true),
+    body: JSON.stringify(body),
+  });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  const summary = flat.data as
+    | { targeted: number; sent: number; failed: number; skipped: number }
+    | undefined;
+  const out = summary ?? {
+    targeted: Number(flat.targeted),
+    sent: Number(flat.sent),
+    failed: Number(flat.failed),
+    skipped: Number(flat.skipped),
+  };
+  if (Number.isNaN(out.targeted)) {
+    throw new Error("Invalid push send response");
+  }
+  return out;
+}
+
+export async function fetchAdminNotifications(params?: { page?: number; limit?: number }) {
+  const sp = new URLSearchParams();
+  if (params?.page != null) sp.set("page", String(params.page));
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  const qs = sp.toString();
+  const res = await fetch(`${API_BASE}/api/admin/notifications${qs ? `?${qs}` : ""}`, {
+    headers: getHeaders(true),
+  });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  const broadcasts = flat.broadcasts as PushBroadcastRow[] | undefined;
+  const pagination = flat.pagination as PaginationMeta | undefined;
+  if (!broadcasts || !pagination) {
+    throw new Error("Invalid broadcast history response");
+  }
+  return { broadcasts, pagination };
 }

@@ -60,6 +60,11 @@ const navItems: NavItem[] = [
     name: "FAQ",
     path: "/faq",
   },
+  {
+    icon: <FileIcon />,
+    name: "Push notifications",
+    path: "/push-notifications",
+  },
 ];
 
 

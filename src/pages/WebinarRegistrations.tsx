@@ -6,6 +6,9 @@ import {
   fetchWebinarRegistrations,
   deleteWebinarRegistration,
   updateWebinarPackages,
+  fetchWebinarCoupons,
+  upsertWebinarCoupon,
+  type WebinarCoupon,
   type WebinarPackage,
   type WebinarRegistration,
 } from "../lib/api";
@@ -40,6 +43,7 @@ function registrationsToCsv(rows: WebinarRegistration[]): string {
     "Consent",
     "Package",
     "Package Amount (₹)",
+    "Coupon",
     "Message",
     "Paid",
     "Payment ID",
@@ -65,6 +69,7 @@ function registrationsToCsv(rows: WebinarRegistration[]): string {
         r.consentUpdates ? "Yes" : "No",
         r.packageId ?? "",
         r.packageAmountPaise != null ? String(Math.round(r.packageAmountPaise / 100)) : "",
+        r.couponCode ?? "",
         r.message ?? "",
         r.razorpayPaymentId ? "Yes" : "No",
         r.razorpayPaymentId ?? "",
@@ -103,8 +108,16 @@ export default function WebinarRegistrations() {
   const [downloading, setDownloading] = useState(false);
   const [viewId, setViewId] = useState<string | null>(null);
   const [packages, setPackages] = useState<WebinarPackage[]>([]);
+  const [coupons, setCoupons] = useState<WebinarCoupon[]>([]);
   const [editingPackages, setEditingPackages] = useState(false);
   const [savingPackages, setSavingPackages] = useState(false);
+  const [editingCoupon, setEditingCoupon] = useState(false);
+  const [savingCoupon, setSavingCoupon] = useState(false);
+  const [couponCodeInput, setCouponCodeInput] = useState("");
+  const [couponActive, setCouponActive] = useState(true);
+  const [couponBasicRupees, setCouponBasicRupees] = useState(99);
+  const [couponProRupees, setCouponProRupees] = useState(299);
+  const [couponPremiumRupees, setCouponPremiumRupees] = useState(999);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; email?: string } | null>(
     null,
@@ -145,6 +158,15 @@ export default function WebinarRegistrations() {
     }
   }, []);
 
+  const loadCoupons = useCallback(async () => {
+    try {
+      const res = await fetchWebinarCoupons();
+      setCoupons(res.coupons);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load coupons");
+    }
+  }, []);
+
   useEffect(() => {
     loadRegistrations();
   }, [loadRegistrations]);
@@ -152,6 +174,10 @@ export default function WebinarRegistrations() {
   useEffect(() => {
     loadPackages();
   }, [loadPackages]);
+
+  useEffect(() => {
+    loadCoupons();
+  }, [loadCoupons]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -296,6 +322,13 @@ export default function WebinarRegistrations() {
           >
             {editingPackages ? "Close Package Prices" : "Edit Package Prices"}
           </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setEditingCoupon((v) => !v)}
+          >
+            {editingCoupon ? "Close Coupons" : "Manage Coupons"}
+          </Button>
         </div>
 
         {/* Package prices modal */}
@@ -381,6 +414,193 @@ export default function WebinarRegistrations() {
                 </Button>
                 <Button size="sm" disabled={savingPackages} onClick={handleSavePackages}>
                   {savingPackages ? "Saving..." : "Save"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Coupon modal */}
+        {editingCoupon && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => !savingCoupon && setEditingCoupon(false)}
+          >
+            <div
+              className="w-full max-w-3xl rounded-2xl bg-white p-5 shadow-xl dark:bg-gray-800"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Manage webinar coupon
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Set discounted amount (in ₹) per selected package. Coupon will be applied only if the
+                    package key is set here.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="rounded-lg px-2 py-1 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  onClick={() => !savingCoupon && setEditingCoupon(false)}
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="sm:col-span-2">
+                  <label className="text-xs text-gray-600 dark:text-gray-400">Coupon code</label>
+                  <input
+                    type="text"
+                    value={couponCodeInput}
+                    onChange={(e) => setCouponCodeInput(e.target.value)}
+                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                    placeholder="e.g. MIND199"
+                  />
+                </div>
+
+                <div className="rounded-xl border border-gray-200 p-3 dark:border-gray-700">
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Basic (₹)</p>
+                  <input
+                    type="number"
+                    min={1}
+                    value={couponBasicRupees}
+                    onChange={(e) => setCouponBasicRupees(Math.max(1, Number(e.target.value || 1)))}
+                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                  />
+                </div>
+                <div className="rounded-xl border border-gray-200 p-3 dark:border-gray-700">
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Pro (₹)</p>
+                  <input
+                    type="number"
+                    min={1}
+                    value={couponProRupees}
+                    onChange={(e) => setCouponProRupees(Math.max(1, Number(e.target.value || 1)))}
+                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                  />
+                </div>
+                <div className="rounded-xl border border-gray-200 p-3 dark:border-gray-700">
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Premium (₹)</p>
+                  <input
+                    type="number"
+                    min={1}
+                    value={couponPremiumRupees}
+                    onChange={(e) => setCouponPremiumRupees(Math.max(1, Number(e.target.value || 1)))}
+                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                  />
+                </div>
+                <div className="rounded-xl border border-gray-200 p-3 dark:border-gray-700 flex items-center">
+                  <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                    <input
+                      type="checkbox"
+                      checked={couponActive}
+                      onChange={(e) => setCouponActive(e.target.checked)}
+                    />
+                    Active
+                  </label>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <p className="text-sm font-medium text-gray-800 dark:text-white mb-2">Existing coupons</p>
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  {coupons.length === 0 ? (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">No coupons found.</p>
+                  ) : (
+                    coupons.slice(0, 10).map((c) => (
+                      <div
+                        key={c.code}
+                        className="flex items-center justify-between rounded-xl border border-gray-200 p-3 dark:border-gray-700"
+                      >
+                        <div className="text-sm">
+                          <p className="font-semibold text-gray-900 dark:text-white">{c.code}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {c.active ? "Active" : "Inactive"} ·{" "}
+                            Basic:{" "}
+                            {typeof c.amountPaiseByPackage.basic === "number"
+                              ? Math.round(c.amountPaiseByPackage.basic / 100)
+                              : "—"}
+                            {" · "}Pro:{" "}
+                            {typeof c.amountPaiseByPackage.pro === "number"
+                              ? Math.round(c.amountPaiseByPackage.pro / 100)
+                              : "—"}
+                            {" · "}Premium:{" "}
+                            {typeof c.amountPaiseByPackage.premium === "number"
+                              ? Math.round(c.amountPaiseByPackage.premium / 100)
+                              : "—"}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          className="text-xs text-brand-600 hover:underline dark:text-brand-400"
+                          onClick={() => {
+                            setCouponCodeInput(c.code);
+                            setCouponActive(c.active);
+                            setCouponBasicRupees(
+                              typeof c.amountPaiseByPackage.basic === "number"
+                                ? Math.round(c.amountPaiseByPackage.basic / 100)
+                                : 99,
+                            );
+                            setCouponProRupees(
+                              typeof c.amountPaiseByPackage.pro === "number"
+                                ? Math.round(c.amountPaiseByPackage.pro / 100)
+                                : 299,
+                            );
+                            setCouponPremiumRupees(
+                              typeof c.amountPaiseByPackage.premium === "number"
+                                ? Math.round(c.amountPaiseByPackage.premium / 100)
+                                : 999,
+                            );
+                          }}
+                        >
+                          Edit
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={savingCoupon}
+                  onClick={() => setEditingCoupon(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={savingCoupon || !couponCodeInput.trim()}
+                  onClick={async () => {
+                    setSavingCoupon(true);
+                    setError(null);
+                    try {
+                      await upsertWebinarCoupon({
+                        code: couponCodeInput.trim(),
+                        active: couponActive,
+                        amountPaiseByPackage: {
+                          basic: Math.round(couponBasicRupees * 100),
+                          pro: Math.round(couponProRupees * 100),
+                          premium: Math.round(couponPremiumRupees * 100),
+                        },
+                      });
+                      await loadCoupons();
+                      setEditingCoupon(false);
+                    } catch (e) {
+                      setError(e instanceof Error ? e.message : "Failed to save coupon");
+                    } finally {
+                      setSavingCoupon(false);
+                    }
+                  }}
+                >
+                  {savingCoupon ? "Saving..." : "Save coupon"}
                 </Button>
               </div>
             </div>
@@ -531,7 +751,18 @@ export default function WebinarRegistrations() {
               <div><span className="font-medium">City:</span> {selectedView.city || "—"}</div>
               <div>
                 <span className="font-medium">Package:</span> {selectedView.packageId} (₹
-                {selectedView.packageAmountPaise != null ? Math.round(selectedView.packageAmountPaise / 100) : "—"})
+                {selectedView.packageAmountPaise != null ? Math.round(selectedView.packageAmountPaise / 100) : "—"}
+                )
+                {selectedView.packageOriginalAmountPaise != null &&
+                  selectedView.packageOriginalAmountPaise !== selectedView.packageAmountPaise && (
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {" "}
+                      | Original ₹{Math.round(selectedView.packageOriginalAmountPaise / 100)}
+                    </span>
+                  )}
+              </div>
+              <div>
+                <span className="font-medium">Coupon:</span> {selectedView.couponCode || "—"}
               </div>
               <div>
                 <span className="font-medium">Background:</span>{" "}

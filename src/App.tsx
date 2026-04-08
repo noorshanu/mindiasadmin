@@ -26,6 +26,7 @@ import ContentManagement from "./pages/ContentManagement";
 import SupportManagement from "./pages/SupportManagement";
 import FaqManagement from "./pages/FaqManagement";
 import WebinarRegistrations from "./pages/WebinarRegistrations";
+import PushNotifications from "./pages/PushNotifications";
 
 export default function App() {
   return (
@@ -77,6 +78,7 @@ export default function App() {
             <Route path="/support" element={<SupportManagement />} />
             <Route path="/faq" element={<FaqManagement />} />
             <Route path="/webinar" element={<WebinarRegistrations />} />
+            <Route path="/push-notifications" element={<PushNotifications />} />
           </Route>
 
           {/* Auth — guest only */}

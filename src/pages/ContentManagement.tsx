@@ -11,8 +11,11 @@ import {
   deleteTeamMember,
   fetchSocial,
   updateSocial,
+  uploadHomeHeroSlide,
+  deleteHomeHeroSlide,
   type TeamMember,
   type SocialSettings,
+  type HomeHeroSlide,
 } from "../lib/api";
 import Button from "../components/ui/button/Button";
 import TextArea from "../components/form/input/TextArea";
@@ -25,9 +28,13 @@ const DEFAULT_VISION =
 const DEFAULT_MISSION =
   "To be there for the 3 AM thoughts. For the unsent messages. For the feelings that don't have names yet. Our mission is to build an AI that listens without judgment, guides without control, and supports without pretending to replace real humans. We exist to help people slow down, feel seen, and find clarity—one honest conversation at a time. Because healing doesn't always start with answers. Sometimes, it starts with being heard.";
 
+const DEFAULT_THOUGHT =
+  "Small steps still move you forward. Be gentle with yourself today.";
+
 export default function ContentManagement() {
   const [vision, setVision] = useState(DEFAULT_VISION);
   const [mission, setMission] = useState(DEFAULT_MISSION);
+  const [thought, setThought] = useState(DEFAULT_THOUGHT);
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -49,6 +56,10 @@ export default function ContentManagement() {
     address: "",
     businessHours: "",
   });
+  const [homeHeroSlides, setHomeHeroSlides] = useState<HomeHeroSlide[]>([]);
+  const [heroAlt, setHeroAlt] = useState("");
+  const [uploadingHero, setUploadingHero] = useState(false);
+  const [deletingHeroId, setDeletingHeroId] = useState<string | null>(null);
 
   const loadContent = useCallback(async () => {
     setLoading(true);
@@ -61,6 +72,12 @@ export default function ContentManagement() {
       ]);
       setVision(contentRes.vision || DEFAULT_VISION);
       setMission(contentRes.mission || DEFAULT_MISSION);
+      setThought(
+        typeof contentRes.thought === "string"
+          ? contentRes.thought
+          : DEFAULT_THOUGHT,
+      );
+      setHomeHeroSlides(contentRes.homeHeroSlides ?? []);
       setTeam(teamRes.data || []);
       setSocial({
         facebookUrl: socialRes.data.facebookUrl || "",
@@ -137,13 +154,41 @@ export default function ContentManagement() {
     setError(null);
     setSuccess(false);
     try {
-      await updateContent({ vision, mission });
+      const res = await updateContent({ vision, mission, thought });
+      setHomeHeroSlides(res.homeHeroSlides);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleUploadHeroSlide = async (file: File) => {
+    setUploadingHero(true);
+    setError(null);
+    try {
+      const res = await uploadHomeHeroSlide(file, heroAlt || undefined);
+      setHomeHeroSlides(res.homeHeroSlides);
+      setHeroAlt("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to upload hero image");
+    } finally {
+      setUploadingHero(false);
+    }
+  };
+
+  const handleDeleteHeroSlide = async (id: string) => {
+    setDeletingHeroId(id);
+    setError(null);
+    try {
+      const res = await deleteHomeHeroSlide(id);
+      setHomeHeroSlides(res.homeHeroSlides);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to delete slide");
+    } finally {
+      setDeletingHeroId(null);
     }
   };
 
@@ -164,15 +209,15 @@ export default function ContentManagement() {
 
   return (
     <>
-      <PageMeta title="Content | Admin" description="Manage Vision & Mission" />
+      <PageMeta title="Content | Admin" description="Manage Vision, Mission & Thought of the day" />
       <PageBreadcrumb pageTitle="Content" />
       <div className="space-y-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-xl font-semibold text-gray-800 dark:text-white/90">
-            Vision & Mission
+            Site content
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Update the content shown on the app&apos;s about/landing section.
+            Vision, mission, and thought of the day (public APIs for app / VR).
           </p>
         </div>
 
@@ -217,10 +262,110 @@ export default function ContentManagement() {
               />
             </div>
 
+            <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+              <Label htmlFor="thought" className="mb-2 block text-base font-medium">
+                Thought of the day
+              </Label>
+              <p className="mb-2 text-sm text-gray-500 dark:text-gray-400">
+                Short line shown in the app or VR. Public endpoint:{" "}
+                <code className="rounded bg-gray-100 px-1 text-xs dark:bg-gray-700">
+                  GET /api/content/thought-of-the-day
+                </code>
+              </p>
+              <TextArea
+                value={thought}
+                onChange={setThought}
+                rows={4}
+                placeholder="Enter today's thought..."
+                className="min-h-[100px]"
+              />
+            </div>
+
             <div className="flex justify-end gap-3">
               <Button onClick={handleSave} disabled={saving}>
-                {saving ? "Saving..." : "Save Vision & Mission"}
+                {saving ? "Saving..." : "Save site content"}
               </Button>
+            </div>
+
+            {/* Dashboard home hero carousel (app) */}
+            <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+              <h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">
+                Home hero slider
+              </h2>
+              <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
+                Images shown in the user dashboard home carousel. Public:{" "}
+                <code className="rounded bg-gray-100 px-1 text-xs dark:bg-gray-700">
+                  GET /api/content
+                </code>{" "}
+                → <code className="rounded bg-gray-100 px-1 text-xs dark:bg-gray-700">homeHeroSlides</code>.
+              </p>
+
+              <div className="mb-6 flex flex-wrap items-end gap-4">
+                <div className="min-w-[200px] flex-1">
+                  <Label className="mb-1">Alt text (optional)</Label>
+                  <Input
+                    value={heroAlt}
+                    onChange={(e) => setHeroAlt(e.target.value)}
+                    placeholder="Describe the image for accessibility"
+                  />
+                </div>
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-brand-500 bg-brand-500/10 px-4 py-2.5 text-sm font-medium text-brand-600 hover:bg-brand-500/20 dark:text-brand-400">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  {uploadingHero ? "Uploading..." : "Upload slide image"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={uploadingHero}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) void handleUploadHeroSlide(f);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {homeHeroSlides.map((s) => (
+                  <div
+                    key={s._id}
+                    className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-600"
+                  >
+                    <div className="relative aspect-[5/2] bg-gray-100 dark:bg-gray-700">
+                      <img
+                        src={s.imageUrl}
+                        alt={s.alt || "Hero slide"}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-2 border-t border-gray-100 p-2 dark:border-gray-600">
+                      <span className="truncate text-xs text-gray-500" title={s.alt}>
+                        {s.alt || "—"}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={deletingHeroId === s._id}
+                        onClick={() => {
+                          if (window.confirm("Remove this slide from the carousel?")) {
+                            void handleDeleteHeroSlide(s._id);
+                          }
+                        }}
+                        className="shrink-0 text-xs text-red-500 hover:underline disabled:opacity-50"
+                      >
+                        {deletingHeroId === s._id ? "…" : "Delete"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {homeHeroSlides.length === 0 && (
+                <p className="py-4 text-center text-sm text-gray-500">
+                  No slides yet. Upload images above — they appear on the app dashboard home.
+                </p>
+              )}
             </div>
 
             {/* Our Team Section */}
