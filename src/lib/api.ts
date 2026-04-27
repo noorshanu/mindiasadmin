@@ -1,5 +1,4 @@
-//const API_BASE ="http://localhost:4000";
-const API_BASE = "https://api.mindsai.live";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 
 /**
  * API wraps JSON as `{ success, message, data }`. Nested objects are merged up; arrays stay under `data`.
@@ -598,6 +597,7 @@ export type WebinarRegistration = {
   _id: string;
   name: string;
   email: string;
+  eventKey?: string;
   phone: string;
   city: string;
   backgroundType: "working_professional" | "student";
@@ -666,6 +666,10 @@ export type WebinarPackage = {
   name: string;
   amountPaise: number;
   active: boolean;
+};
+
+export type WebinarEventSettings = {
+  currentEventKey: string;
 };
 
 export type WebinarCoupon = {
@@ -745,6 +749,34 @@ export async function updateWebinarPackages(packages: WebinarPackage[]) {
     success: true as const,
     currency: String(flat.currency ?? "INR"),
     packages: flat.packages as WebinarPackage[],
+  };
+}
+
+export async function fetchWebinarEventSettings() {
+  const res = await fetch(`${API_BASE}/api/admin/webinar-settings/event`, {
+    headers: getHeaders(true),
+  });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  return {
+    success: true as const,
+    currentEventKey: String(flat.currentEventKey ?? ""),
+  };
+}
+
+export async function updateWebinarEventSettings(body: WebinarEventSettings) {
+  const res = await fetch(`${API_BASE}/api/admin/webinar-settings/event`, {
+    method: "PUT",
+    headers: getHeaders(true),
+    body: JSON.stringify(body),
+  });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  return {
+    success: true as const,
+    currentEventKey: String(flat.currentEventKey ?? ""),
   };
 }
 

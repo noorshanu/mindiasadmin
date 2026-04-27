@@ -2,9 +2,11 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import PageMeta from "../components/common/PageMeta";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import {
+  fetchWebinarEventSettings,
   fetchWebinarPackages,
   fetchWebinarRegistrations,
   deleteWebinarRegistration,
+  updateWebinarEventSettings,
   updateWebinarPackages,
   fetchWebinarCoupons,
   upsertWebinarCoupon,
@@ -113,6 +115,10 @@ export default function WebinarRegistrations() {
   const [savingPackages, setSavingPackages] = useState(false);
   const [editingCoupon, setEditingCoupon] = useState(false);
   const [savingCoupon, setSavingCoupon] = useState(false);
+  const [editingEvent, setEditingEvent] = useState(false);
+  const [savingEvent, setSavingEvent] = useState(false);
+  const [currentEventKey, setCurrentEventKey] = useState("");
+  const [eventKeyInput, setEventKeyInput] = useState("");
   const [couponCodeInput, setCouponCodeInput] = useState("");
   const [couponActive, setCouponActive] = useState(true);
   const [couponBasicRupees, setCouponBasicRupees] = useState(99);
@@ -167,6 +173,16 @@ export default function WebinarRegistrations() {
     }
   }, []);
 
+  const loadEventSettings = useCallback(async () => {
+    try {
+      const res = await fetchWebinarEventSettings();
+      setCurrentEventKey(res.currentEventKey);
+      setEventKeyInput(res.currentEventKey);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load event settings");
+    }
+  }, []);
+
   useEffect(() => {
     loadRegistrations();
   }, [loadRegistrations]);
@@ -178,6 +194,10 @@ export default function WebinarRegistrations() {
   useEffect(() => {
     loadCoupons();
   }, [loadCoupons]);
+
+  useEffect(() => {
+    loadEventSettings();
+  }, [loadEventSettings]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -329,7 +349,20 @@ export default function WebinarRegistrations() {
           >
             {editingCoupon ? "Close Coupons" : "Manage Coupons"}
           </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setEditingEvent((v) => !v)}
+          >
+            {editingEvent ? "Close Event" : "Manage Event Key"}
+          </Button>
         </div>
+
+        {currentEventKey && (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-700/60 dark:bg-emerald-900/20 dark:text-emerald-300">
+            Current registration event key: <span className="font-semibold">{currentEventKey}</span>
+          </div>
+        )}
 
         {/* Package prices modal */}
         {editingPackages && (
@@ -607,6 +640,86 @@ export default function WebinarRegistrations() {
           </div>
         )}
 
+        {/* Event settings modal */}
+        {editingEvent && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => !savingEvent && setEditingEvent(false)}
+          >
+            <div
+              className="w-full max-w-xl rounded-2xl bg-white p-5 shadow-xl dark:bg-gray-800"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Manage current masterclass event key
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Duplicate email checks are scoped to this key. Change this key for each new masterclass event.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="rounded-lg px-2 py-1 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  onClick={() => !savingEvent && setEditingEvent(false)}
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="mt-4">
+                <label className="text-xs text-gray-600 dark:text-gray-400">Event key</label>
+                <input
+                  type="text"
+                  value={eventKeyInput}
+                  onChange={(e) => setEventKeyInput(e.target.value)}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                  placeholder="e.g. masterclass_2026_08_01_1930_ist"
+                />
+                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  Tip: use a unique key per event, such as date and time.
+                </p>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={savingEvent}
+                  onClick={() => setEditingEvent(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={savingEvent || !eventKeyInput.trim()}
+                  onClick={async () => {
+                    setSavingEvent(true);
+                    setError(null);
+                    try {
+                      const res = await updateWebinarEventSettings({
+                        currentEventKey: eventKeyInput.trim(),
+                      });
+                      setCurrentEventKey(res.currentEventKey);
+                      setEditingEvent(false);
+                    } catch (e) {
+                      setError(e instanceof Error ? e.message : "Failed to save event key");
+                    } finally {
+                      setSavingEvent(false);
+                    }
+                  }}
+                >
+                  {savingEvent ? "Saving..." : "Save event key"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {error && (
           <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-600 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
             {error}
@@ -627,6 +740,7 @@ export default function WebinarRegistrations() {
                   <tr className="border-b border-gray-200 dark:border-gray-700">
                     <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Name</th>
                     <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Email</th>
+                    <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Event</th>
                     <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Phone</th>
                     <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Package</th>
                     <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Submitted</th>
@@ -647,6 +761,9 @@ export default function WebinarRegistrations() {
                           >
                             {r.email}
                           </a>
+                        </td>
+                        <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
+                          {r.eventKey || <span className="text-gray-400">—</span>}
                         </td>
                         <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
                           {r.phone || <span className="text-gray-400">—</span>}
