@@ -1,4 +1,5 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://api.mindsai.live";
+//const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 
 /**
  * API wraps JSON as `{ success, message, data }`. Nested objects are merged up; arrays stay under `data`.
@@ -892,4 +893,241 @@ export async function fetchAdminNotifications(params?: { page?: number; limit?: 
     throw new Error("Invalid broadcast history response");
   }
   return { broadcasts, pagination };
+}
+
+// --- Store management --------------------------------------------------------
+
+export type AdminStoreCategory = {
+  _id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  imageUrl?: string;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type AdminStoreProduct = {
+  _id: string;
+  title: string;
+  slug: string;
+  categoryId: string | { _id: string; name?: string; slug?: string };
+  shortDescription?: string;
+  description?: string;
+  priceInr: number;
+  mrpInr?: number;
+  stockQty: number;
+  isDigital?: boolean;
+  status: "draft" | "active" | "archived";
+  images?: Array<{ url: string; alt?: string }>;
+  rating?: number;
+  reviewCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type AdminStoreOrder = {
+  _id: string;
+  orderNumber: string;
+  status: "placed" | "confirmed" | "shipped" | "delivered" | "cancelled";
+  totalInr: number;
+  email: string;
+  customerName: string;
+  paymentMethod: "upi" | "card" | "cod";
+  createdAt?: string;
+};
+
+export async function fetchStoreCategories() {
+  const res = await fetch(`${API_BASE}/api/admin/store/categories`, { headers: getHeaders(true) });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  const items = (flat.items ?? flat.data) as AdminStoreCategory[] | undefined;
+  return { success: true as const, items: Array.isArray(items) ? items : [] };
+}
+
+export async function createStoreCategory(body: {
+  name: string;
+  slug: string;
+  description?: string;
+  imageUrl?: string;
+  sortOrder?: number;
+  isActive?: boolean;
+}) {
+  const res = await fetch(`${API_BASE}/api/admin/store/categories`, {
+    method: "POST",
+    headers: getHeaders(true),
+    body: JSON.stringify(body),
+  });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  return { success: true as const, item: flat.item as AdminStoreCategory };
+}
+
+export async function updateStoreCategory(id: string, body: Partial<Omit<AdminStoreCategory, "_id">>) {
+  const res = await fetch(`${API_BASE}/api/admin/store/categories/${id}`, {
+    method: "PUT",
+    headers: getHeaders(true),
+    body: JSON.stringify(body),
+  });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  return { success: true as const, item: flat.item as AdminStoreCategory };
+}
+
+export async function deleteStoreCategory(id: string) {
+  const res = await fetch(`${API_BASE}/api/admin/store/categories/${id}`, {
+    method: "DELETE",
+    headers: getHeaders(true),
+  });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  return { success: true as const };
+}
+
+export async function uploadStoreCategoryImage(id: string, file: File) {
+  const formData = new FormData();
+  formData.append("image", file);
+  const token = getToken();
+  const headers: HeadersInit = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_BASE}/api/admin/store/categories/${id}/upload-image`, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  return {
+    success: true as const,
+    imageUrl: String(flat.imageUrl ?? ""),
+    item: flat.item as AdminStoreCategory,
+  };
+}
+
+export async function fetchStoreProducts(params?: { page?: number; limit?: number; search?: string }) {
+  const sp = new URLSearchParams();
+  if (params?.page != null) sp.set("page", String(params.page));
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  if (params?.search != null && params.search.trim()) sp.set("search", params.search.trim());
+  const qs = sp.toString();
+  const res = await fetch(`${API_BASE}/api/admin/store/products${qs ? `?${qs}` : ""}`, {
+    headers: getHeaders(true),
+  });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  return {
+    success: true as const,
+    items: ((flat.items ?? flat.data) as AdminStoreProduct[]) ?? [],
+    pagination: flat.pagination as PaginationMeta,
+  };
+}
+
+export async function createStoreProduct(body: {
+  title: string;
+  slug: string;
+  categoryId: string;
+  shortDescription?: string;
+  description?: string;
+  priceInr: number;
+  mrpInr?: number;
+  stockQty?: number;
+  isDigital?: boolean;
+  status?: "draft" | "active" | "archived";
+}) {
+  const res = await fetch(`${API_BASE}/api/admin/store/products`, {
+    method: "POST",
+    headers: getHeaders(true),
+    body: JSON.stringify(body),
+  });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  return { success: true as const, item: flat.item as AdminStoreProduct };
+}
+
+export async function updateStoreProduct(id: string, body: Record<string, unknown>) {
+  const res = await fetch(`${API_BASE}/api/admin/store/products/${id}`, {
+    method: "PUT",
+    headers: getHeaders(true),
+    body: JSON.stringify(body),
+  });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  return { success: true as const, item: flat.item as AdminStoreProduct };
+}
+
+export async function deleteStoreProduct(id: string) {
+  const res = await fetch(`${API_BASE}/api/admin/store/products/${id}`, {
+    method: "DELETE",
+    headers: getHeaders(true),
+  });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  return { success: true as const };
+}
+
+export async function uploadStoreProductImage(id: string, file: File, alt?: string) {
+  const formData = new FormData();
+  formData.append("image", file);
+  if (alt != null && alt.trim()) formData.append("alt", alt.trim());
+  const token = getToken();
+  const headers: HeadersInit = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_BASE}/api/admin/store/products/${id}/upload-image`, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  return {
+    success: true as const,
+    imageUrl: String(flat.imageUrl ?? ""),
+    item: flat.item as AdminStoreProduct,
+  };
+}
+
+export async function fetchStoreOrders(params?: { page?: number; limit?: number; status?: string }) {
+  const sp = new URLSearchParams();
+  if (params?.page != null) sp.set("page", String(params.page));
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  if (params?.status != null && params.status.trim()) sp.set("status", params.status.trim());
+  const qs = sp.toString();
+  const res = await fetch(`${API_BASE}/api/admin/store/orders${qs ? `?${qs}` : ""}`, {
+    headers: getHeaders(true),
+  });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  return {
+    success: true as const,
+    items: ((flat.items ?? flat.data) as AdminStoreOrder[]) ?? [],
+    pagination: flat.pagination as PaginationMeta,
+  };
+}
+
+export async function updateStoreOrderStatus(
+  id: string,
+  status: "placed" | "confirmed" | "shipped" | "delivered" | "cancelled",
+) {
+  const res = await fetch(`${API_BASE}/api/admin/store/orders/${id}/status`, {
+    method: "PATCH",
+    headers: getHeaders(true),
+    body: JSON.stringify({ status }),
+  });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  return { success: true as const, item: flat.item as AdminStoreOrder };
 }

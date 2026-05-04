@@ -65,6 +65,11 @@ const navItems: NavItem[] = [
     name: "Push notifications",
     path: "/push-notifications",
   },
+  {
+    icon: <FileIcon />,
+    name: "Store Management",
+    path: "/store-management",
+  },
 ];
 
 
