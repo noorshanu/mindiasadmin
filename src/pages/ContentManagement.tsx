@@ -170,7 +170,13 @@ export default function ContentManagement() {
     setError(null);
     try {
       const res = await uploadHomeHeroSlide(file, heroAlt || undefined);
-      setHomeHeroSlides(res.homeHeroSlides);
+      setHomeHeroSlides((prev) =>
+        res.homeHeroSlides.length > 0
+          ? res.homeHeroSlides
+          : res.slide
+            ? [...prev, res.slide]
+            : prev,
+      );
       setHeroAlt("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to upload hero image");

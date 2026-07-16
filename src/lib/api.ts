@@ -1,5 +1,85 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://api.mindsai.live";
-//const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || "https://api.mindsai.live")
+  .replace(/\/api\/?$/, "")
+  .replace(/\/$/, "");
+// Local dev: VITE_API_BASE_URL=http://localhost:4000
+
+async function readApiResponse(res: Response): Promise<unknown> {
+  const text = await res.text();
+  const trimmed = text.trim();
+  if (!trimmed) return {};
+  if (trimmed.startsWith("<")) {
+    if (res.status === 413) {
+      throw new Error(
+        "Image is too large for the server. Use a smaller file (under 5MB) or compress the image.",
+      );
+    }
+    throw new Error(
+      `Server returned HTML instead of JSON (HTTP ${res.status}). Check VITE_API_BASE_URL — it must be your API host (e.g. https://api.mindsai.live), not the admin website URL.`,
+    );
+  }
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    throw new Error(`Invalid JSON from server (HTTP ${res.status}): ${text.slice(0, 160)}`);
+  }
+}
+
+/** Shrink large photos before multipart upload (avoids nginx 413 HTML errors). */
+async function compressImageForUpload(file: File, maxWidth = 1600, quality = 0.85): Promise<File> {
+  if (!file.type.startsWith("image/") || file.size < 900_000) return file;
+  if (typeof createImageBitmap !== "function") return file;
+
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, maxWidth / bitmap.width);
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      bitmap.close();
+      return file;
+    }
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, "image/jpeg", quality);
+    });
+    if (!blob) return file;
+    const base = file.name.replace(/\.[^.]+$/, "") || "image";
+    return new File([blob], `${base}.jpg`, { type: "image/jpeg" });
+  } catch {
+    return file;
+  }
+}
+
+async function postMultipart(
+  path: string,
+  file: File,
+  extraFields?: Record<string, string>,
+): Promise<{ res: Response; raw: Record<string, unknown> }> {
+  const prepared = await compressImageForUpload(file);
+  const formData = new FormData();
+  formData.append("image", prepared);
+  if (extraFields) {
+    for (const [key, value] of Object.entries(extraFields)) {
+      if (value.trim()) formData.append(key, value.trim());
+    }
+  }
+  const token = getToken();
+  const headers: HeadersInit = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+  const raw = (await readApiResponse(res)) as Record<string, unknown>;
+  throwIfFailed(res, raw);
+  return { res, raw };
+}
 
 /**
  * API wraps JSON as `{ success, message, data }`. Nested objects are merged up; arrays stay under `data`.
@@ -312,14 +392,23 @@ export type HomeHeroSlide = {
 };
 
 function parseHomeHeroSlides(raw: unknown): HomeHeroSlide[] {
-  if (!Array.isArray(raw)) return [];
-  return raw
+  const list = (() => {
+    if (Array.isArray(raw)) return raw;
+    if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+      const nested = (raw as Record<string, unknown>).homeHeroSlides;
+      if (Array.isArray(nested)) return nested;
+    }
+    return [];
+  })();
+
+  return list
     .map((item) => {
       if (!item || typeof item !== "object") return null;
       const o = item as Record<string, unknown>;
-      const _id = o["_id"];
       const imageUrl = o["imageUrl"];
-      if (typeof _id !== "string" || typeof imageUrl !== "string") return null;
+      if (typeof imageUrl !== "string" || !imageUrl.trim()) return null;
+      const _id = o["_id"] != null ? String(o["_id"]) : "";
+      if (!_id) return null;
       return {
         _id,
         imageUrl,
@@ -329,6 +418,16 @@ function parseHomeHeroSlides(raw: unknown): HomeHeroSlide[] {
     })
     .filter((x): x is HomeHeroSlide => x != null)
     .sort((a, b) => a.order - b.order);
+}
+
+function pickHomeHeroSlides(flat: Record<string, unknown>): HomeHeroSlide[] {
+  const direct = parseHomeHeroSlides(flat.homeHeroSlides);
+  if (direct.length > 0) return direct;
+  const data = flat.data;
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    return parseHomeHeroSlides((data as Record<string, unknown>).homeHeroSlides);
+  }
+  return [];
 }
 
 export async function fetchContent() {
@@ -343,7 +442,7 @@ export async function fetchContent() {
     vision: String(flat.vision ?? ""),
     mission: String(flat.mission ?? ""),
     thought: String(flat.thought ?? ""),
-    homeHeroSlides: parseHomeHeroSlides(flat.homeHeroSlides),
+    homeHeroSlides: pickHomeHeroSlides(flat),
   };
 }
 
@@ -365,36 +464,27 @@ export async function updateContent(body: {
     vision: String(flat.vision ?? ""),
     mission: String(flat.mission ?? ""),
     thought: String(flat.thought ?? ""),
-    homeHeroSlides: parseHomeHeroSlides(flat.homeHeroSlides),
+    homeHeroSlides: pickHomeHeroSlides(flat),
   };
 }
 
 /** Multipart field `image`; optional `alt` text field. */
 export async function uploadHomeHeroSlide(file: File, alt?: string) {
-  const formData = new FormData();
-  formData.append("image", file);
-  if (alt != null && alt.trim()) formData.append("alt", alt.trim());
-  const token = getToken();
-  const headers: HeadersInit = {};
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  const res = await fetch(`${API_BASE}/api/admin/content/home-hero-slide`, {
-    method: "POST",
-    headers,
-    body: formData,
+  const { raw } = await postMultipart("/api/admin/content/home-hero-slide", file, {
+    alt: alt ?? "",
   });
-  const raw = await res.json();
-  throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   return {
     success: true as const,
-    homeHeroSlides: parseHomeHeroSlides(flat.homeHeroSlides),
+    homeHeroSlides: pickHomeHeroSlides(flat),
     slide: (() => {
       const s = flat.slide;
       if (!s || typeof s !== "object") return null;
       const o = s as Record<string, unknown>;
-      const _id = o["_id"];
       const imageUrl = o["imageUrl"];
-      if (typeof _id !== "string" || typeof imageUrl !== "string") return null;
+      if (typeof imageUrl !== "string" || !imageUrl.trim()) return null;
+      const _id = o["_id"] != null ? String(o["_id"]) : "";
+      if (!_id) return null;
       return {
         _id,
         imageUrl,
@@ -418,7 +508,7 @@ export async function deleteHomeHeroSlide(slideId: string) {
   const flat = unwrapBackendSuccess(raw);
   return {
     success: true as const,
-    homeHeroSlides: parseHomeHeroSlides(flat.homeHeroSlides),
+    homeHeroSlides: pickHomeHeroSlides(flat),
   };
 }
 
@@ -512,24 +602,15 @@ export async function updateTeamMember(id: string, body: { name?: string; title?
 }
 
 export async function uploadTeamMemberImage(id: string, file: File) {
-  const formData = new FormData();
-  formData.append("image", file);
-  const token = getToken();
-  const headers: HeadersInit = {};
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  const res = await fetch(`${API_BASE}/api/admin/team/${id}/upload`, {
-    method: "POST",
-    headers,
-    body: formData,
-  });
-  const raw = await res.json();
-  throwIfFailed(res, raw);
+  const { raw } = await postMultipart(`/api/admin/team/${id}/upload`, file);
   const flat = unwrapBackendSuccess(raw);
-  const member = flat.data as TeamMember;
-  if (!member || !flat.imageUrl) throw new Error("Failed to upload image");
+  const member = (flat.data ?? flat.item ?? flat) as TeamMember;
+  if (!member || typeof member !== "object" || !("_id" in member)) {
+    throw new Error("Failed to upload image");
+  }
   return {
     success: true as const,
-    imageUrl: flat.imageUrl as string,
+    imageUrl: String(flat.imageUrl ?? (member as TeamMember).imageUrl ?? ""),
     data: member,
   };
 }
@@ -990,24 +1071,13 @@ export async function deleteStoreCategory(id: string) {
 }
 
 export async function uploadStoreCategoryImage(id: string, file: File) {
-  const formData = new FormData();
-  formData.append("image", file);
-  const token = getToken();
-  const headers: HeadersInit = {};
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-
-  const res = await fetch(`${API_BASE}/api/admin/store/categories/${id}/upload-image`, {
-    method: "POST",
-    headers,
-    body: formData,
-  });
-  const raw = await res.json();
-  throwIfFailed(res, raw);
+  const { raw } = await postMultipart(`/api/admin/store/categories/${id}/upload-image`, file);
   const flat = unwrapBackendSuccess(raw);
+  const item = (flat.item ?? flat.data) as AdminStoreCategory;
   return {
     success: true as const,
-    imageUrl: String(flat.imageUrl ?? ""),
-    item: flat.item as AdminStoreCategory,
+    imageUrl: String(flat.imageUrl ?? item?.imageUrl ?? ""),
+    item,
   };
 }
 
@@ -1076,25 +1146,18 @@ export async function deleteStoreProduct(id: string) {
 }
 
 export async function uploadStoreProductImage(id: string, file: File, alt?: string) {
-  const formData = new FormData();
-  formData.append("image", file);
-  if (alt != null && alt.trim()) formData.append("alt", alt.trim());
-  const token = getToken();
-  const headers: HeadersInit = {};
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-
-  const res = await fetch(`${API_BASE}/api/admin/store/products/${id}/upload-image`, {
-    method: "POST",
-    headers,
-    body: formData,
+  const { raw } = await postMultipart(`/api/admin/store/products/${id}/upload-image`, file, {
+    alt: alt ?? "",
   });
-  const raw = await res.json();
-  throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
+  const item = (flat.item ?? flat.data) as AdminStoreProduct;
+  if (!item || typeof item !== "object") {
+    throw new Error("Upload succeeded but product data was missing from the response.");
+  }
   return {
     success: true as const,
     imageUrl: String(flat.imageUrl ?? ""),
-    item: flat.item as AdminStoreProduct,
+    item,
   };
 }
 
