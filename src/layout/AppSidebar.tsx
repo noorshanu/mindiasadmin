@@ -52,7 +52,7 @@ const navItems: NavItem[] = [
   },
   {
     icon: <FileIcon />,
-    name: "Webinar Registrations",
+    name: "Webinars",
     path: "/webinar",
   },
   {

@@ -707,6 +707,7 @@ export async function fetchWebinarRegistrations(params?: {
   search?: string;
   paid?: boolean;
   packageId?: string;
+  eventKey?: string;
 }) {
   const sp = new URLSearchParams();
   if (params?.page != null) sp.set("page", String(params.page));
@@ -715,6 +716,7 @@ export async function fetchWebinarRegistrations(params?: {
   if (params?.paid === true) sp.set("paid", "true");
   if (params?.paid === false) sp.set("paid", "false");
   if (params?.packageId != null && params.packageId.trim()) sp.set("packageId", params.packageId.trim());
+  if (params?.eventKey != null && params.eventKey.trim()) sp.set("eventKey", params.eventKey.trim());
   const qs = sp.toString();
   const url = `${API_BASE}/api/admin/webinar${qs ? `?${qs}` : ""}`;
   const res = await fetch(url, { headers: getHeaders(true) });
@@ -860,6 +862,112 @@ export async function updateWebinarEventSettings(body: WebinarEventSettings) {
     success: true as const,
     currentEventKey: String(flat.currentEventKey ?? ""),
   };
+}
+
+// ——— Webinar Events (Webinar 1 / 2 / 3 cards) ——————————————————————————————
+
+export type WebinarEventCard = {
+  _id: string;
+  eventKey: string;
+  title: string;
+  description?: string;
+  startsAt?: string | null;
+  registrationOpensAt?: string | null;
+  registrationClosesAt?: string | null;
+  status: "draft" | "open" | "closed";
+  registrationCount: number;
+  isCurrent: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export async function fetchWebinarEvents() {
+  const res = await fetch(`${API_BASE}/api/admin/webinar-events`, { headers: getHeaders(true) });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  const items = (flat.items ?? flat.data) as WebinarEventCard[];
+  if (!Array.isArray(items)) throw new Error("Failed to fetch webinars");
+  return {
+    success: true as const,
+    currentEventKey: String(flat.currentEventKey ?? ""),
+    items,
+  };
+}
+
+export async function createWebinarEvent(body: {
+  title: string;
+  description?: string;
+  startsAt?: string | null;
+  registrationOpensAt?: string | null;
+  registrationClosesAt?: string | null;
+  status?: "draft" | "open" | "closed";
+  activate?: boolean;
+  eventKey?: string;
+}) {
+  const res = await fetch(`${API_BASE}/api/admin/webinar-events`, {
+    method: "POST",
+    headers: getHeaders(true),
+    body: JSON.stringify(body),
+  });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  return {
+    success: true as const,
+    event: flat.event as WebinarEventCard,
+    currentEventKey: String(flat.currentEventKey ?? ""),
+    message: String(flat.message ?? ""),
+  };
+}
+
+export async function updateWebinarEvent(
+  id: string,
+  body: {
+    title?: string;
+    description?: string;
+    startsAt?: string | null;
+    registrationOpensAt?: string | null;
+    registrationClosesAt?: string | null;
+    status?: "draft" | "open" | "closed";
+  },
+) {
+  const res = await fetch(`${API_BASE}/api/admin/webinar-events/${id}`, {
+    method: "PUT",
+    headers: getHeaders(true),
+    body: JSON.stringify(body),
+  });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  return { success: true as const, event: flat.event as WebinarEventCard, isCurrent: !!flat.isCurrent };
+}
+
+export async function activateWebinarEvent(id: string) {
+  const res = await fetch(`${API_BASE}/api/admin/webinar-events/${id}/activate`, {
+    method: "POST",
+    headers: getHeaders(true),
+  });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  return {
+    success: true as const,
+    event: flat.event as WebinarEventCard,
+    currentEventKey: String(flat.currentEventKey ?? ""),
+    message: String(flat.message ?? ""),
+  };
+}
+
+export async function closeWebinarRegistration(id: string) {
+  const res = await fetch(`${API_BASE}/api/admin/webinar-events/${id}/close-registration`, {
+    method: "POST",
+    headers: getHeaders(true),
+  });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  return { success: true as const, event: flat.event as WebinarEventCard };
 }
 
 // ——— FAQ —————————————————————————————————────────────────────────────────
