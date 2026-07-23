@@ -708,6 +708,7 @@ export async function fetchWebinarRegistrations(params?: {
   paid?: boolean;
   packageId?: string;
   eventKey?: string;
+  couponCode?: string;
 }) {
   const sp = new URLSearchParams();
   if (params?.page != null) sp.set("page", String(params.page));
@@ -717,6 +718,7 @@ export async function fetchWebinarRegistrations(params?: {
   if (params?.paid === false) sp.set("paid", "false");
   if (params?.packageId != null && params.packageId.trim()) sp.set("packageId", params.packageId.trim());
   if (params?.eventKey != null && params.eventKey.trim()) sp.set("eventKey", params.eventKey.trim());
+  if (params?.couponCode != null && params.couponCode.trim()) sp.set("couponCode", params.couponCode.trim());
   const qs = sp.toString();
   const url = `${API_BASE}/api/admin/webinar${qs ? `?${qs}` : ""}`;
   const res = await fetch(url, { headers: getHeaders(true) });

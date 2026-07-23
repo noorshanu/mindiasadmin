@@ -24,6 +24,8 @@ import Input from "../components/form/input/InputField";
 
 type PaidFilter = "all" | "paid" | "unpaid";
 type PackageFilter = "all" | "basic" | "pro" | "premium";
+/** all | __ANY__ | __NONE__ | specific code */
+type CouponFilter = string;
 
 function fmtDate(value?: string | null) {
   if (!value) return "—";
@@ -60,14 +62,16 @@ function registrationsToCsv(rows: WebinarRegistration[]): string {
     "#",
     "Name",
     "Email",
-    "Event Key",
     "Phone",
     "City",
+    "Coupon / Referral Code",
     "Package",
-    "Amount (₹)",
-    "Coupon",
+    "Amount Paid (₹)",
+    "Original Amount (₹)",
+    "Event Key",
     "Paid",
     "Payment ID",
+    "Order ID",
     "Submitted",
   ];
   const lines = [headers.map(escapeCsvCell).join(",")];
@@ -77,14 +81,18 @@ function registrationsToCsv(rows: WebinarRegistration[]): string {
         String(idx + 1),
         r.name,
         r.email,
-        r.eventKey ?? "",
         r.phone ?? "",
         r.city ?? "",
+        r.couponCode?.trim() ? r.couponCode.trim().toUpperCase() : "",
         r.packageId ?? "",
         r.packageAmountPaise != null ? String(Math.round(r.packageAmountPaise / 100)) : "",
-        r.couponCode ?? "",
+        r.packageOriginalAmountPaise != null
+          ? String(Math.round(r.packageOriginalAmountPaise / 100))
+          : "",
+        r.eventKey ?? "",
         r.razorpayPaymentId ? "Yes" : "No",
         r.razorpayPaymentId ?? "",
+        r.razorpayOrderId ?? "",
         r.createdAt ? new Date(r.createdAt).toLocaleString() : "",
       ]
         .map(escapeCsvCell)
@@ -153,6 +161,7 @@ export default function WebinarRegistrations() {
   const [search, setSearch] = useState("");
   const [paidFilter, setPaidFilter] = useState<PaidFilter>("all");
   const [packageFilter, setPackageFilter] = useState<PackageFilter>("all");
+  const [couponFilter, setCouponFilter] = useState<CouponFilter>("all");
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
   const [downloading, setDownloading] = useState(false);
   const [viewId, setViewId] = useState<string | null>(null);
@@ -232,6 +241,7 @@ export default function WebinarRegistrations() {
         paid: paidFilter === "all" ? undefined : paidFilter === "paid" ? true : false,
         packageId: packageFilter === "all" ? undefined : packageFilter,
         eventKey: selectedEvent.eventKey,
+        couponCode: couponFilter === "all" ? undefined : couponFilter,
       });
       setRegistrations(res.data);
       setPagination(res.pagination);
@@ -247,6 +257,7 @@ export default function WebinarRegistrations() {
     search,
     paidFilter,
     packageFilter,
+    couponFilter,
   ]);
 
   useEffect(() => {
@@ -266,6 +277,7 @@ export default function WebinarRegistrations() {
     setSearchInput("");
     setPaidFilter("all");
     setPackageFilter("all");
+    setCouponFilter("all");
     setPagination((p) => ({ ...p, page: 1 }));
   };
 
@@ -485,6 +497,7 @@ export default function WebinarRegistrations() {
         paid: paidFilter === "all" ? undefined : paidFilter === "paid" ? true : false,
         packageId: packageFilter === "all" ? undefined : packageFilter,
         eventKey: selectedEvent.eventKey,
+        couponCode: couponFilter === "all" ? undefined : couponFilter,
       });
       const csv = registrationsToCsv(res.data);
       downloadCsv(csv, `${selectedEvent.title.replace(/\s+/g, "-").toLowerCase()}-regs.csv`);
@@ -675,6 +688,24 @@ export default function WebinarRegistrations() {
                 <option value="pro">Pro</option>
                 <option value="premium">Premium</option>
               </select>
+              <select
+                value={couponFilter}
+                onChange={(e) => {
+                  setCouponFilter(e.target.value);
+                  setPagination((p) => ({ ...p, page: 1 }));
+                }}
+                className="h-9 max-w-[200px] rounded-lg border border-gray-200 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-800"
+                title="Filter by coupon / referral code"
+              >
+                <option value="all">All coupons</option>
+                <option value="__ANY__">Used any coupon</option>
+                <option value="__NONE__">No coupon</option>
+                {coupons.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.code}
+                  </option>
+                ))}
+              </select>
               <Button size="sm" variant="outline" disabled={downloading || pagination.total === 0} onClick={() => void handleDownload()}>
                 {downloading ? "Downloading…" : "Download CSV"}
               </Button>
@@ -687,6 +718,7 @@ export default function WebinarRegistrations() {
                   <tr>
                     <th className="px-4 py-3">Name</th>
                     <th className="px-4 py-3">Email</th>
+                    <th className="px-4 py-3">Coupon / Referral</th>
                     <th className="px-4 py-3">Package</th>
                     <th className="px-4 py-3">Paid</th>
                     <th className="px-4 py-3">Submitted</th>
@@ -696,13 +728,13 @@ export default function WebinarRegistrations() {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                         Loading…
                       </td>
                     </tr>
                   ) : registrations.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                         No registrations for this webinar yet.
                       </td>
                     </tr>
@@ -712,6 +744,15 @@ export default function WebinarRegistrations() {
                         <tr className="border-t border-gray-100 dark:border-gray-800">
                           <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{r.name}</td>
                           <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{r.email}</td>
+                          <td className="px-4 py-3">
+                            {r.couponCode?.trim() ? (
+                              <span className="rounded-md bg-emerald-50 px-2 py-0.5 font-mono text-xs font-semibold text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200">
+                                {r.couponCode}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">—</span>
+                            )}
+                          </td>
                           <td className="px-4 py-3 capitalize">
                             {r.packageId}
                             {r.packageAmountPaise != null ? ` · ₹${Math.round(r.packageAmountPaise / 100)}` : ""}
@@ -1126,8 +1167,26 @@ export default function WebinarRegistrations() {
               <div><dt className="text-gray-500">Email</dt><dd>{selectedView.email}</dd></div>
               <div><dt className="text-gray-500">Phone</dt><dd>{selectedView.phone}</dd></div>
               <div><dt className="text-gray-500">City</dt><dd>{selectedView.city}</dd></div>
+              <div>
+                <dt className="text-gray-500">Coupon / Referral code</dt>
+                <dd className="font-mono font-semibold text-emerald-700 dark:text-emerald-300">
+                  {selectedView.couponCode?.trim() ? selectedView.couponCode : "— (none used)"}
+                </dd>
+              </div>
               <div><dt className="text-gray-500">Event key</dt><dd className="font-mono text-xs">{selectedView.eventKey || "—"}</dd></div>
-              <div><dt className="text-gray-500">Package</dt><dd className="capitalize">{selectedView.packageId} {selectedView.couponCode ? `(coupon ${selectedView.couponCode})` : ""}</dd></div>
+              <div>
+                <dt className="text-gray-500">Package</dt>
+                <dd className="capitalize">
+                  {selectedView.packageId}
+                  {selectedView.packageAmountPaise != null
+                    ? ` · paid ₹${Math.round(selectedView.packageAmountPaise / 100)}`
+                    : ""}
+                  {selectedView.packageOriginalAmountPaise != null &&
+                  selectedView.packageOriginalAmountPaise !== selectedView.packageAmountPaise
+                    ? ` (was ₹${Math.round(selectedView.packageOriginalAmountPaise / 100)})`
+                    : ""}
+                </dd>
+              </div>
               <div><dt className="text-gray-500">Paid</dt><dd>{selectedView.razorpayPaymentId || "No"}</dd></div>
             </dl>
             <div className="mt-5 flex justify-end">
