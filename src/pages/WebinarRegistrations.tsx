@@ -105,10 +105,25 @@ function downloadCsv(csv: string, filename: string) {
 }
 
 function statusBadge(status: WebinarEventCard["status"], isCurrent: boolean) {
-  if (isCurrent) {
+  // Current event key ≠ registration open. After "Close", isCurrent stays true but status is closed.
+  if (isCurrent && status === "open") {
     return (
       <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800 dark:bg-green-900/40 dark:text-green-200">
         Active signup
+      </span>
+    );
+  }
+  if (isCurrent && status === "closed") {
+    return (
+      <span className="rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-semibold text-orange-800 dark:bg-orange-900/40 dark:text-orange-200">
+        Current · reg. closed
+      </span>
+    );
+  }
+  if (isCurrent && status === "draft") {
+    return (
+      <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+        Current · draft
       </span>
     );
   }
@@ -254,8 +269,17 @@ export default function WebinarRegistrations() {
     setPagination((p) => ({ ...p, page: 1 }));
   };
 
+  const openEvent = useMemo(() => events.find((e) => e.status === "open") || null, [events]);
+  const mustCloseFirst = !!openEvent;
+
   const handleCreateWebinar = async () => {
     if (!createForm.title.trim() || saving) return;
+    if (createForm.activate && mustCloseFirst) {
+      setError(
+        `Close registration on "${openEvent?.title}" first, then create/activate a new webinar.`,
+      );
+      return;
+    }
     setSaving(true);
     setError(null);
     setInfo(null);
@@ -266,7 +290,7 @@ export default function WebinarRegistrations() {
         startsAt: fromLocalInputValue(createForm.startsAt),
         registrationOpensAt: fromLocalInputValue(createForm.registrationOpensAt),
         registrationClosesAt: fromLocalInputValue(createForm.registrationClosesAt),
-        activate: createForm.activate,
+        activate: createForm.activate && !mustCloseFirst,
       });
       setInfo(
         res.message ||
@@ -279,7 +303,7 @@ export default function WebinarRegistrations() {
         startsAt: "",
         registrationOpensAt: "",
         registrationClosesAt: "",
-        activate: true,
+        activate: !mustCloseFirst,
       });
       await loadEvents();
     } catch (e) {
@@ -313,11 +337,31 @@ export default function WebinarRegistrations() {
     setSaving(true);
     setError(null);
     try {
-      await closeWebinarRegistration(ev._id);
-      setInfo(`Registration closed for ${ev.title}.`);
+      const res = await closeWebinarRegistration(ev._id);
+      setInfo(
+        res.message ||
+          `Registration closed for ${ev.title}. Public form is blocked until you re-open or activate another webinar.`,
+      );
       await loadEvents();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to close registration");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleReopenReg = async (ev: WebinarEventCard) => {
+    if (saving) return;
+    setSaving(true);
+    setError(null);
+    setInfo(null);
+    try {
+      // activate clears registrationClosesAt and sets status open
+      const res = await activateWebinarEvent(ev._id);
+      setInfo(res.message || `Registration re-opened for ${ev.title}.`);
+      await loadEvents();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to re-open registration");
     } finally {
       setSaving(false);
     }
@@ -481,7 +525,13 @@ export default function WebinarRegistrations() {
               Coupons
             </Button>
             {view === "cards" ? (
-              <Button size="sm" onClick={() => setShowCreate(true)}>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setCreateForm((p) => ({ ...p, activate: !mustCloseFirst }));
+                  setShowCreate(true);
+                }}
+              >
                 + Create webinar
               </Button>
             ) : null}
@@ -561,9 +611,13 @@ export default function WebinarRegistrations() {
                       <Button size="sm" variant="outline" disabled={saving} onClick={() => void handleActivate(ev)}>
                         Make active
                       </Button>
-                    ) : (
+                    ) : ev.status === "open" ? (
                       <Button size="sm" variant="outline" disabled={saving} onClick={() => void handleCloseReg(ev)}>
                         Close registration
+                      </Button>
+                    ) : (
+                      <Button size="sm" variant="outline" disabled={saving} onClick={() => void handleReopenReg(ev)}>
+                        Re-open registration
                       </Button>
                     )}
                   </div>
@@ -721,6 +775,12 @@ export default function WebinarRegistrations() {
             <p className="mt-1 text-sm text-gray-500">
               Creates a new event key. Old webinar emails can register again once this one is active.
             </p>
+            {mustCloseFirst ? (
+              <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
+                <strong>{openEvent?.title}</strong> still has open registration. Close it first, then you can
+                activate a new webinar. You can still create this one as a <em>draft</em> now.
+              </div>
+            ) : null}
             <div className="mt-4 space-y-3">
               <label className="block text-sm">
                 Title
@@ -766,13 +826,15 @@ export default function WebinarRegistrations() {
                   className="mt-1"
                 />
               </label>
-              <label className="flex items-center gap-2 text-sm">
+              <label className={`flex items-center gap-2 text-sm ${mustCloseFirst ? "opacity-60" : ""}`}>
                 <input
                   type="checkbox"
-                  checked={createForm.activate}
+                  checked={createForm.activate && !mustCloseFirst}
+                  disabled={mustCloseFirst}
                   onChange={(e) => setCreateForm((p) => ({ ...p, activate: e.target.checked }))}
                 />
                 Make this the active webinar for new signups now
+                {mustCloseFirst ? " (disabled until you close the open webinar)" : ""}
               </label>
             </div>
             <div className="mt-5 flex justify-end gap-2">

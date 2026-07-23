@@ -967,7 +967,11 @@ export async function closeWebinarRegistration(id: string) {
   const raw = await res.json();
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
-  return { success: true as const, event: flat.event as WebinarEventCard };
+  return {
+    success: true as const,
+    event: flat.event as WebinarEventCard,
+    message: String(flat.message ?? ""),
+  };
 }
 
 // ——— FAQ —————————————————————————————————────────────────────────────────
