@@ -166,17 +166,19 @@ export default function ContentManagement() {
   };
 
   const handleUploadHeroSlide = async (file: File) => {
+    if (uploadingHero) return;
     setUploadingHero(true);
     setError(null);
     try {
       const res = await uploadHomeHeroSlide(file, heroAlt || undefined);
-      setHomeHeroSlides((prev) =>
-        res.homeHeroSlides.length > 0
-          ? res.homeHeroSlides
-          : res.slide
-            ? [...prev, res.slide]
-            : prev,
-      );
+      if (Array.isArray(res.homeHeroSlides) && res.homeHeroSlides.length > 0) {
+        setHomeHeroSlides(res.homeHeroSlides);
+      } else if (res.slide) {
+        setHomeHeroSlides((prev) => {
+          const exists = prev.some((s) => s._id === res.slide!._id || s.imageUrl === res.slide!.imageUrl);
+          return exists ? prev : [...prev, res.slide!];
+        });
+      }
       setHeroAlt("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to upload hero image");
@@ -186,17 +188,24 @@ export default function ContentManagement() {
   };
 
   const handleDeleteHeroSlide = async (id: string) => {
+    if (deletingHeroId) return;
     setDeletingHeroId(id);
     setError(null);
     try {
       const res = await deleteHomeHeroSlide(id);
-      setHomeHeroSlides(res.homeHeroSlides);
+      if (Array.isArray(res.homeHeroSlides)) {
+        setHomeHeroSlides(res.homeHeroSlides);
+      } else {
+        setHomeHeroSlides((prev) => prev.filter((s) => s._id !== id));
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to delete slide");
     } finally {
       setDeletingHeroId(null);
     }
   };
+
+  const [activeTab, setActiveTab] = useState<"app_content" | "hero_slides" | "team_members" | "social_info">("app_content");
 
   const handleSaveSocial = async () => {
     setSavingSocial(true);
@@ -215,16 +224,92 @@ export default function ContentManagement() {
 
   return (
     <>
-      <PageMeta title="Content | Admin" description="Manage Vision, Mission & Thought of the day" />
-      <PageBreadcrumb pageTitle="Content" />
+      <PageMeta title="Content Management | Admin" description="Manage Vision, Mission, Hero Slides, Team Members, and Social Info" />
+      <PageBreadcrumb pageTitle="Content Management" />
       <div className="space-y-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-xl font-semibold text-gray-800 dark:text-white/90">
-            Site content
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Vision, mission, and thought of the day (public APIs for app / VR).
-          </p>
+        {/* Top Overview & Shortcuts */}
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                Content Management Hub
+              </h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Manage all app branding, copy, banner slides, store items, and public metadata in one organized place.
+              </p>
+            </div>
+          </div>
+
+          {/* Quick Nav Shortcuts */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+            <a
+              href="/store-management"
+              className="flex items-center gap-3 p-3.5 rounded-xl border border-gray-200 dark:border-gray-800 hover:border-brand-500 bg-gray-50/50 dark:bg-gray-800/40 transition group"
+            >
+              <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-lg">
+                🛍️
+              </div>
+              <div>
+                <div className="text-xs font-bold text-gray-900 dark:text-white group-hover:text-brand-600 dark:group-hover:text-brand-400">
+                  Store & Products →
+                </div>
+                <div className="text-[11px] text-gray-500">Categories, items & orders</div>
+              </div>
+            </a>
+
+            <a
+              href="/push-notifications"
+              className="flex items-center gap-3 p-3.5 rounded-xl border border-gray-200 dark:border-gray-800 hover:border-brand-500 bg-gray-50/50 dark:bg-gray-800/40 transition group"
+            >
+              <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold text-lg">
+                🔔
+              </div>
+              <div>
+                <div className="text-xs font-bold text-gray-900 dark:text-white group-hover:text-brand-600 dark:group-hover:text-brand-400">
+                  Push Notifications →
+                </div>
+                <div className="text-[11px] text-gray-500">Broadcast app announcements</div>
+              </div>
+            </a>
+
+            <a
+              href="/faq"
+              className="flex items-center gap-3 p-3.5 rounded-xl border border-gray-200 dark:border-gray-800 hover:border-brand-500 bg-gray-50/50 dark:bg-gray-800/40 transition group"
+            >
+              <div className="w-10 h-10 rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold text-lg">
+                ❓
+              </div>
+              <div>
+                <div className="text-xs font-bold text-gray-900 dark:text-white group-hover:text-brand-600 dark:group-hover:text-brand-400">
+                  FAQ Management →
+                </div>
+                <div className="text-[11px] text-gray-500">Help center questions & answers</div>
+              </div>
+            </a>
+          </div>
+        </div>
+
+        {/* Tab Selection */}
+        <div className="flex border-b border-gray-200 dark:border-gray-800 space-x-4">
+          {[
+            { key: "app_content", label: "Vision & Mission", icon: "✨" },
+            { key: "hero_slides", label: "Banner Slides", icon: "🖼️" },
+            { key: "team_members", label: "Our Team", icon: "👥" },
+            { key: "social_info", label: "Social & Office Info", icon: "🌐" },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key as any)}
+              className={`pb-3 px-2 text-sm font-semibold border-b-2 transition flex items-center gap-2 ${
+                activeTab === tab.key
+                  ? "border-brand-500 text-brand-600 dark:text-brand-400"
+                  : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+              }`}
+            >
+              <span>{tab.icon}</span>
+              <span>{tab.label}</span>
+            </button>
+          ))}
         </div>
 
         {error && (
@@ -239,348 +324,347 @@ export default function ContentManagement() {
         )}
 
         {loading ? (
-          <div className="p-8 text-center text-gray-500">Loading...</div>
+          <div className="p-8 text-center text-gray-500">Loading content...</div>
         ) : (
           <div className="space-y-6">
-            <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-              <Label htmlFor="vision" className="mb-2 block text-base font-medium">
-                Our Vision
-              </Label>
-              <TextArea
-                value={vision}
-                onChange={setVision}
-                rows={6}
-                placeholder="Enter vision text..."
-                className="min-h-[140px]"
-              />
-            </div>
-
-            <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-              <Label htmlFor="mission" className="mb-2 block text-base font-medium">
-                Our Mission
-              </Label>
-              <TextArea
-                value={mission}
-                onChange={setMission}
-                rows={6}
-                placeholder="Enter mission text..."
-                className="min-h-[140px]"
-              />
-            </div>
-
-            <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-              <Label htmlFor="thought" className="mb-2 block text-base font-medium">
-                Thought of the day
-              </Label>
-              <p className="mb-2 text-sm text-gray-500 dark:text-gray-400">
-                Short line shown in the app or VR. Public endpoint:{" "}
-                <code className="rounded bg-gray-100 px-1 text-xs dark:bg-gray-700">
-                  GET /api/content/thought-of-the-day
-                </code>
-              </p>
-              <TextArea
-                value={thought}
-                onChange={setThought}
-                rows={4}
-                placeholder="Enter today's thought..."
-                className="min-h-[100px]"
-              />
-            </div>
-
-            <div className="flex justify-end gap-3">
-              <Button onClick={handleSave} disabled={saving}>
-                {saving ? "Saving..." : "Save site content"}
-              </Button>
-            </div>
-
-            {/* Dashboard home hero carousel (app) */}
-            <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-              <h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">
-                Home hero slider
-              </h2>
-              <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
-                Images shown in the user dashboard home carousel. Public:{" "}
-                <code className="rounded bg-gray-100 px-1 text-xs dark:bg-gray-700">
-                  GET /api/content
-                </code>{" "}
-                → <code className="rounded bg-gray-100 px-1 text-xs dark:bg-gray-700">homeHeroSlides</code>.
-              </p>
-
-              <div className="mb-6 flex flex-wrap items-end gap-4">
-                <div className="min-w-[200px] flex-1">
-                  <Label className="mb-1">Alt text (optional)</Label>
-                  <Input
-                    value={heroAlt}
-                    onChange={(e) => setHeroAlt(e.target.value)}
-                    placeholder="Describe the image for accessibility"
+            {/* TAB 1: App Content (Vision, Mission, Thought) */}
+            {activeTab === "app_content" && (
+              <div className="space-y-6">
+                <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                  <Label htmlFor="vision" className="mb-2 block text-base font-medium">
+                    Our Vision
+                  </Label>
+                  <TextArea
+                    value={vision}
+                    onChange={setVision}
+                    rows={5}
+                    placeholder="Enter vision text..."
+                    className="min-h-[120px]"
                   />
                 </div>
-                <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-brand-500 bg-brand-500/10 px-4 py-2.5 text-sm font-medium text-brand-600 hover:bg-brand-500/20 dark:text-brand-400">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  {uploadingHero ? "Uploading..." : "Upload slide image"}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    disabled={uploadingHero}
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) void handleUploadHeroSlide(f);
-                      e.target.value = "";
-                    }}
-                  />
-                </label>
-              </div>
 
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {homeHeroSlides.map((s) => (
-                  <div
-                    key={s._id}
-                    className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-600"
-                  >
-                    <div className="relative aspect-[5/2] bg-gray-100 dark:bg-gray-700">
-                      <img
-                        src={s.imageUrl}
-                        alt={s.alt || "Hero slide"}
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                    <div className="flex items-center justify-between gap-2 border-t border-gray-100 p-2 dark:border-gray-600">
-                      <span className="truncate text-xs text-gray-500" title={s.alt}>
-                        {s.alt || "—"}
-                      </span>
-                      <button
-                        type="button"
-                        disabled={deletingHeroId === s._id}
-                        onClick={() => {
-                          if (window.confirm("Remove this slide from the carousel?")) {
-                            void handleDeleteHeroSlide(s._id);
-                          }
-                        }}
-                        className="shrink-0 text-xs text-red-500 hover:underline disabled:opacity-50"
-                      >
-                        {deletingHeroId === s._id ? "…" : "Delete"}
-                      </button>
-                    </div>
+                <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                  <Label htmlFor="mission" className="mb-2 block text-base font-medium">
+                    Our Mission
+                  </Label>
+                  <TextArea
+                    value={mission}
+                    onChange={setMission}
+                    rows={5}
+                    placeholder="Enter mission text..."
+                    className="min-h-[120px]"
+                  />
+                </div>
+
+                <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                  <Label htmlFor="thought" className="mb-2 block text-base font-medium">
+                    Thought of the Day
+                  </Label>
+                  <p className="mb-2 text-sm text-gray-500 dark:text-gray-400">
+                    Short motivational line shown in the mobile app / VR interface.
+                  </p>
+                  <TextArea
+                    value={thought}
+                    onChange={setThought}
+                    rows={3}
+                    placeholder="Enter today's thought..."
+                    className="min-h-[90px]"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-3">
+                  <Button onClick={handleSave} disabled={saving} className="bg-brand-500 hover:bg-brand-600 text-white">
+                    {saving ? "Saving..." : "Save App Content"}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 2: Home Hero Carousel */}
+            {activeTab === "hero_slides" && (
+              <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800 space-y-6">
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                    Home Hero Banner Carousel
+                  </h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    Upload and manage high-resolution banner slides displayed on the mobile app home screen.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-end gap-4 p-4 bg-gray-50 dark:bg-gray-800/40 rounded-xl border border-gray-200 dark:border-gray-700">
+                  <div className="min-w-[240px] flex-1">
+                    <Label className="mb-1">Slide Description / Alt Text (Optional)</Label>
+                    <Input
+                      value={heroAlt}
+                      onChange={(e) => setHeroAlt(e.target.value)}
+                      placeholder="e.g. Welcome to Mind's AI platform"
+                    />
                   </div>
-                ))}
-              </div>
-              {homeHeroSlides.length === 0 && (
-                <p className="py-4 text-center text-sm text-gray-500">
-                  No slides yet. Upload images above — they appear on the app dashboard home.
-                </p>
-              )}
-            </div>
-
-            {/* Our Team Section */}
-            <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-              <h2 className="mb-4 text-lg font-semibold text-gray-800 dark:text-white/90">
-                Our Team
-              </h2>
-              <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">
-                Add, edit, or remove team members. Click &quot;Upload image&quot; on each card to add their photo (stored on Cloudinary).
-              </p>
-
-              {/* Add new member */}
-              <div className="mb-6 flex flex-wrap items-end gap-4">
-                <div className="min-w-[180px]">
-                  <Label className="mb-1">Name</Label>
-                  <Input
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    placeholder="e.g. Mr. Sai Prasanth AB"
-                  />
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-brand-500 bg-brand-500 text-white px-4 py-2.5 text-sm font-medium hover:bg-brand-600 transition shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    {uploadingHero ? "Uploading..." : "Upload Slide Image"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={uploadingHero}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) void handleUploadHeroSlide(f);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
                 </div>
-                <div className="min-w-[180px]">
-                  <Label className="mb-1">Title</Label>
-                  <Input
-                    value={newTitle}
-                    onChange={(e) => setNewTitle(e.target.value)}
-                    placeholder="e.g. Founder and CEO"
-                  />
-                </div>
-                <Button
-                  onClick={handleAddMember}
-                  disabled={addingMember || !newName.trim() || !newTitle.trim()}
-                >
-                  {addingMember ? "Adding..." : "Add Member"}
-                </Button>
-              </div>
 
-              {/* Team list */}
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {team.map((m) => (
-                  <div
-                    key={m._id}
-                    className="rounded-lg border border-gray-200 p-4 dark:border-gray-600"
-                  >
-                    <div className="mb-3 flex items-start justify-between gap-2">
-                      <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-gray-200 dark:bg-gray-700">
-                        {m.imageUrl ? (
-                          <img
-                            src={m.imageUrl}
-                            alt={m.name}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center text-2xl text-gray-400">
-                            ?
-                          </div>
-                        )}
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {homeHeroSlides.map((s) => (
+                    <div
+                      key={s._id}
+                      className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm"
+                    >
+                      <div className="relative aspect-[5/2] bg-gray-100 dark:bg-gray-800">
+                        <img
+                          src={s.imageUrl}
+                          alt={s.alt || "Hero slide"}
+                          className="h-full w-full object-cover"
+                        />
                       </div>
-                      <div className="flex flex-col gap-2">
-                        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-brand-500 bg-brand-500/10 px-3 py-1.5 text-sm font-medium text-brand-600 hover:bg-brand-500/20 dark:text-brand-400">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                          </svg>
-                          {uploadingId === m._id ? "Uploading..." : "Upload image"}
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            disabled={uploadingId === m._id}
-                            onChange={(e) => {
-                              const f = e.target.files?.[0];
-                              if (f) handleUploadImage(m._id, f);
-                              e.target.value = "";
-                            }}
-                          />
-                        </label>
+                      <div className="flex items-center justify-between gap-2 border-t border-gray-100 dark:border-gray-800 p-3">
+                        <span className="truncate text-xs font-medium text-gray-700 dark:text-gray-300" title={s.alt}>
+                          {s.alt || "Banner Slide"}
+                        </span>
                         <button
+                          type="button"
+                          disabled={deletingHeroId === s._id}
                           onClick={() => {
-                            if (window.confirm(`Delete ${m.name}?`)) handleDeleteMember(m._id);
+                            if (window.confirm("Remove this slide from the carousel?")) {
+                              void handleDeleteHeroSlide(s._id);
+                            }
                           }}
-                          className="text-xs text-red-500 hover:underline"
+                          className="shrink-0 text-xs font-semibold text-rose-500 hover:text-rose-700 underline disabled:opacity-50"
                         >
-                          Delete
+                          {deletingHeroId === s._id ? "Deleting..." : "Delete Slide"}
                         </button>
                       </div>
                     </div>
-                    {editingId === m._id ? (
-                      <div className="space-y-2">
-                        <Input
-                          value={editName}
-                          onChange={(e) => setEditName(e.target.value)}
-                          placeholder="Name"
-                        />
-                        <Input
-                          value={editTitle}
-                          onChange={(e) => setEditTitle(e.target.value)}
-                          placeholder="Title"
-                        />
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => handleUpdateMember(m._id)}
-                          >
-                            Save
-                          </Button>
+                  ))}
+                </div>
+                {homeHeroSlides.length === 0 && (
+                  <p className="py-8 text-center text-sm text-gray-500">
+                    No slides active. Upload your first banner slide image above!
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* TAB 3: Our Team Members */}
+            {activeTab === "team_members" && (
+              <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800 space-y-6">
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                    Our Team Members
+                  </h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    Manage key leaders, founders, and team members displayed on public pages.
+                  </p>
+                </div>
+
+                {/* Add new member form */}
+                <div className="flex flex-wrap items-end gap-4 p-4 bg-gray-50 dark:bg-gray-800/40 rounded-xl border border-gray-200 dark:border-gray-700">
+                  <div className="min-w-[200px]">
+                    <Label className="mb-1">Full Name</Label>
+                    <Input
+                      value={newName}
+                      onChange={(e) => setNewName(e.target.value)}
+                      placeholder="e.g. Mr. Sai Prasanth AB"
+                    />
+                  </div>
+                  <div className="min-w-[200px]">
+                    <Label className="mb-1">Title / Role</Label>
+                    <Input
+                      value={newTitle}
+                      onChange={(e) => setNewTitle(e.target.value)}
+                      placeholder="e.g. Founder & CEO"
+                    />
+                  </div>
+                  <Button
+                    onClick={handleAddMember}
+                    disabled={addingMember || !newName.trim() || !newTitle.trim()}
+                    className="bg-brand-500 hover:bg-brand-600 text-white"
+                  >
+                    {addingMember ? "Adding..." : "+ Add Team Member"}
+                  </Button>
+                </div>
+
+                {/* Team Grid */}
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {team.map((m) => (
+                    <div
+                      key={m._id}
+                      className="rounded-xl border border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-900 shadow-sm"
+                    >
+                      <div className="mb-3 flex items-start justify-between gap-3">
+                        <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                          {m.imageUrl ? (
+                            <img
+                              src={m.imageUrl}
+                              alt={m.name}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-xl text-gray-400 font-bold">
+                              👤
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-brand-500/30 bg-brand-50 dark:bg-brand-950/50 px-3 py-1.5 text-xs font-semibold text-brand-600 dark:text-brand-400 hover:bg-brand-100 transition">
+                            {uploadingId === m._id ? "Uploading..." : "Upload Photo"}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              disabled={uploadingId === m._id}
+                              onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                if (f) handleUploadImage(m._id, f);
+                                e.target.value = "";
+                              }}
+                            />
+                          </label>
                           <button
-                            type="button"
-                            onClick={() => setEditingId(null)}
-                            className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+                            onClick={() => {
+                              if (window.confirm(`Delete ${m.name}?`)) handleDeleteMember(m._id);
+                            }}
+                            className="text-xs text-rose-500 hover:underline font-medium text-left"
                           >
-                            Cancel
+                            Delete Member
                           </button>
                         </div>
                       </div>
-                    ) : (
-                      <>
-                        <p className="font-medium text-gray-900 dark:text-white">{m.name}</p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">{m.title}</p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingId(m._id);
-                            setEditName(m.name);
-                            setEditTitle(m.title);
-                          }}
-                          className="mt-2 text-xs text-brand-500 hover:underline"
-                        >
-                          Edit
-                        </button>
-                      </>
-                    )}
+
+                      {editingId === m._id ? (
+                        <div className="space-y-2 pt-2">
+                          <Input
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            placeholder="Name"
+                          />
+                          <Input
+                            value={editTitle}
+                            onChange={(e) => setEditTitle(e.target.value)}
+                            placeholder="Title"
+                          />
+                          <div className="flex gap-2 pt-1">
+                            <Button size="sm" onClick={() => handleUpdateMember(m._id)} className="bg-brand-500 text-white text-xs">
+                              Save
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => setEditingId(null)} className="text-xs">
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="pt-2">
+                          <div className="font-bold text-gray-900 dark:text-white text-sm">{m.name}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{m.title}</div>
+                          <button
+                            onClick={() => {
+                              setEditingId(m._id);
+                              setEditName(m.name);
+                              setEditTitle(m.title);
+                            }}
+                            className="mt-2 text-xs font-semibold text-brand-600 dark:text-brand-400 underline"
+                          >
+                            Edit Name / Title
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {team.length === 0 && (
+                  <p className="py-8 text-center text-sm text-gray-500">
+                    No team members added yet. Add member profile above!
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* TAB 4: Social & Office Info */}
+            {activeTab === "social_info" && (
+              <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800 space-y-6">
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                    Social Handles & Business Info
+                  </h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    Manage official social media URLs, office address, and support business hours.
+                  </p>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <Label className="mb-1">Facebook URL</Label>
+                    <Input
+                      value={social.facebookUrl}
+                      onChange={(e) => setSocial({ ...social, facebookUrl: e.target.value })}
+                      placeholder="https://facebook.com/mindsai"
+                    />
                   </div>
-                ))}
-              </div>
-              {team.length === 0 && (
-                <p className="py-4 text-center text-sm text-gray-500">No team members yet. Add one above.</p>
-              )}
-            </div>
+                  <div>
+                    <Label className="mb-1">Instagram URL</Label>
+                    <Input
+                      value={social.instagramUrl}
+                      onChange={(e) => setSocial({ ...social, instagramUrl: e.target.value })}
+                      placeholder="https://instagram.com/mindsai"
+                    />
+                  </div>
+                  <div>
+                    <Label className="mb-1">Twitter / X URL</Label>
+                    <Input
+                      value={social.twitterUrl}
+                      onChange={(e) => setSocial({ ...social, twitterUrl: e.target.value })}
+                      placeholder="https://x.com/mindsai"
+                    />
+                  </div>
+                  <div>
+                    <Label className="mb-1">LinkedIn URL</Label>
+                    <Input
+                      value={social.linkedinUrl}
+                      onChange={(e) => setSocial({ ...social, linkedinUrl: e.target.value })}
+                      placeholder="https://linkedin.com/company/mindsai"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label className="mb-1">Official Office Address</Label>
+                    <Input
+                      value={social.address}
+                      onChange={(e) => setSocial({ ...social, address: e.target.value })}
+                      placeholder="e.g. Bangalore, Karnataka, India"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label className="mb-1">Business Operating Hours</Label>
+                    <Input
+                      value={social.businessHours}
+                      onChange={(e) => setSocial({ ...social, businessHours: e.target.value })}
+                      placeholder="e.g. Mon - Fri: 9:00 AM - 6:00 PM IST"
+                    />
+                  </div>
+                </div>
 
-            {/* Social & Office Info Section */}
-            <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800 space-y-4">
-              <h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">
-                Social & Office Info
-              </h2>
-              <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
-                Manage social media links and office details used on the contact/support page.
-              </p>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <Label className="mb-1">Facebook URL</Label>
-                  <Input
-                    value={social.facebookUrl || ""}
-                    onChange={(e) => setSocial((s) => ({ ...s, facebookUrl: e.target.value }))}
-                    placeholder="https://facebook.com/yourpage"
-                  />
-                </div>
-                <div>
-                  <Label className="mb-1">Twitter URL</Label>
-                  <Input
-                    value={social.twitterUrl || ""}
-                    onChange={(e) => setSocial((s) => ({ ...s, twitterUrl: e.target.value }))}
-                    placeholder="https://twitter.com/yourhandle"
-                  />
-                </div>
-                <div>
-                  <Label className="mb-1">Instagram URL</Label>
-                  <Input
-                    value={social.instagramUrl || ""}
-                    onChange={(e) => setSocial((s) => ({ ...s, instagramUrl: e.target.value }))}
-                    placeholder="https://instagram.com/yourhandle"
-                  />
-                </div>
-                <div>
-                  <Label className="mb-1">LinkedIn URL</Label>
-                  <Input
-                    value={social.linkedinUrl || ""}
-                    onChange={(e) => setSocial((s) => ({ ...s, linkedinUrl: e.target.value }))}
-                    placeholder="https://linkedin.com/company/yourcompany"
-                  />
+                <div className="flex justify-end pt-4">
+                  <Button onClick={handleSaveSocial} disabled={savingSocial} className="bg-brand-500 hover:bg-brand-600 text-white">
+                    {savingSocial ? "Saving..." : "Save Social & Office Info"}
+                  </Button>
                 </div>
               </div>
-
-              <div>
-                <Label className="mb-1">Office Address</Label>
-                <TextArea
-                  value={social.address || ""}
-                  onChange={(val) => setSocial((s) => ({ ...s, address: val }))}
-                  rows={3}
-                  placeholder="Enter office address..."
-                />
-              </div>
-
-              <div>
-                <Label className="mb-1">Business Hours</Label>
-                <TextArea
-                  value={social.businessHours || ""}
-                  onChange={(val) => setSocial((s) => ({ ...s, businessHours: val }))}
-                  rows={3}
-                  placeholder={"Monday – Friday: 9:00 AM – 6:00 PM\nWeekend: 10:00 AM – 4:00 PM"}
-                />
-              </div>
-
-              <div className="flex justify-end">
-                <Button onClick={handleSaveSocial} disabled={savingSocial}>
-                  {savingSocial ? "Saving..." : "Save Social & Office Info"}
-                </Button>
-              </div>
-            </div>
+            )}
           </div>
         )}
       </div>

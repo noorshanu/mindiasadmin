@@ -160,6 +160,9 @@ export type AdminUser = {
   dateOfBirth?: string;
   persona?: string;
   role: "user" | "admin";
+  adminRole?: "super_admin" | "admin" | "content_manager" | "user_manager" | "webinar_manager" | "custom";
+  permissions?: string[];
+  canAddUsers?: boolean;
   isActive?: boolean;
   isEmailVerified?: boolean;
   isPhoneVerified?: boolean;
@@ -1304,7 +1307,255 @@ export async function updateStoreOrderStatus(
     body: JSON.stringify({ status }),
   });
   const raw = await res.json();
-  throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   return { success: true as const, item: flat.item as AdminStoreOrder };
+}
+
+// ——— Admin Staff & Roles Management —————————————————————————————————————
+
+export async function fetchAdminStaff() {
+  const res = await fetch(`${API_BASE}/api/admin/staff`, { headers: getHeaders(true) });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  const data = (flat.data ?? flat.items ?? []) as AdminUser[];
+  return { success: true as const, data };
+}
+
+export async function createAdminStaff(body: {
+  email: string;
+  password: string;
+  name?: string;
+  adminRole?: string;
+  permissions?: string[];
+  canAddUsers?: boolean;
+}) {
+  const res = await fetch(`${API_BASE}/api/admin/staff`, {
+    method: "POST",
+    headers: getHeaders(true),
+    body: JSON.stringify(body),
+  });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  return { success: true as const, data: flat.data as AdminUser };
+}
+
+export async function updateAdminStaff(
+  id: string,
+  body: {
+    name?: string;
+    adminRole?: string;
+    permissions?: string[];
+    canAddUsers?: boolean;
+    isActive?: boolean;
+  }
+) {
+  const res = await fetch(`${API_BASE}/api/admin/staff/${id}`, {
+    method: "PATCH",
+    headers: getHeaders(true),
+    body: JSON.stringify(body),
+  });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  return { success: true as const, data: flat.data as AdminUser };
+}
+
+export async function deleteAdminStaff(id: string) {
+  const res = await fetch(`${API_BASE}/api/admin/staff/${id}`, {
+    method: "DELETE",
+    headers: getHeaders(true),
+  });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  return unwrapBackendSuccess(raw);
+}
+
+// ——— RAG & Knowledge Base Management —————————————————————————————————————
+
+export type KnowledgeBaseItem = {
+  _id: string;
+  title: string;
+  content: string;
+  category: "anxiety" | "depression" | "trauma" | "relationships" | "stress" | "sleep" | "grief" | "general";
+  createdAt: string;
+};
+
+export type RagMatch = {
+  _id: string;
+  title: string;
+  category: string;
+  contentSnippet: string;
+  similarityScore: number;
+  matchPercentage: number;
+};
+
+export async function fetchKnowledgeBase(params?: { page?: number; limit?: number; search?: string; category?: string }) {
+  const sp = new URLSearchParams();
+  if (params?.page != null) sp.set("page", String(params.page));
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  if (params?.search != null && params.search.trim()) sp.set("search", params.search.trim());
+  if (params?.category != null && params.category.trim()) sp.set("category", params.category.trim());
+  const qs = sp.toString();
+  const res = await fetch(`${API_BASE}/api/admin/knowledge-base${qs ? `?${qs}` : ""}`, { headers: getHeaders(true) });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  return {
+    success: true as const,
+    data: (flat.data ?? flat.items ?? []) as KnowledgeBaseItem[],
+    pagination: flat.pagination as PaginationMeta,
+  };
+}
+
+export async function createKnowledgeBaseItem(body: { title: string; content: string; category: string }) {
+  const res = await fetch(`${API_BASE}/api/admin/knowledge-base`, {
+    method: "POST",
+    headers: getHeaders(true),
+    body: JSON.stringify(body),
+  });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  return { success: true as const, data: flat.data as KnowledgeBaseItem };
+}
+
+export async function testRagQuery(query: string) {
+  const res = await fetch(`${API_BASE}/api/admin/knowledge-base/test-query`, {
+    method: "POST",
+    headers: getHeaders(true),
+    body: JSON.stringify({ query }),
+  });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  return {
+    success: true as const,
+    query: String(flat.query || ""),
+    matches: (flat.matches ?? []) as RagMatch[],
+    formattedRagContext: String(flat.formattedRagContext || ""),
+  };
+}
+
+export async function deleteKnowledgeBaseItem(id: string) {
+  const res = await fetch(`${API_BASE}/api/admin/knowledge-base/${id}`, {
+    method: "DELETE",
+    headers: getHeaders(true),
+  });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  return unwrapBackendSuccess(raw);
+}
+
+// ——— Gamification & User Rewards —————————————————————————————————————————
+
+export type UserRewardRow = {
+  _id: string;
+  user: {
+    _id: string;
+    email: string;
+    username?: string;
+    fullName?: string;
+    isActive: boolean;
+  };
+  points: number;
+  currentStreak: number;
+  bestStreak: number;
+  completedDaysCount: number;
+  updatedAt: string;
+};
+
+export async function fetchRewardsLeaderboard(params?: { page?: number; limit?: number }) {
+  const sp = new URLSearchParams();
+  if (params?.page != null) sp.set("page", String(params.page));
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  const qs = sp.toString();
+  const res = await fetch(`${API_BASE}/api/admin/rewards/leaderboard${qs ? `?${qs}` : ""}`, { headers: getHeaders(true) });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  return {
+    success: true as const,
+    data: (flat.data ?? flat.items ?? []) as UserRewardRow[],
+    pagination: flat.pagination as PaginationMeta,
+  };
+}
+
+export async function grantUserPoints(body: { userId: string; points: number; description?: string }) {
+  const res = await fetch(`${API_BASE}/api/admin/rewards/grant`, {
+    method: "POST",
+    headers: getHeaders(true),
+    body: JSON.stringify(body),
+  });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  return unwrapBackendSuccess(raw);
+}
+
+// ——— Platform Analytics —————————————————————————————————────────────────—
+
+export type PlatformAnalytics = {
+  totalUsers: number;
+  activeUsers: number;
+  inactiveUsers: number;
+  totalChatSessions: number;
+  totalMoodLogs: number;
+  totalJournalEntries: number;
+  totalActivityLogs: number;
+  pendingSupport: number;
+  timestamp: string;
+};
+
+export async function fetchPlatformAnalytics() {
+  const res = await fetch(`${API_BASE}/api/admin/analytics/overview`, { headers: getHeaders(true) });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  return { success: true as const, data: (flat.data ?? flat) as PlatformAnalytics };
+}
+
+export async function fetchMoodTrends() {
+  const res = await fetch(`${API_BASE}/api/admin/analytics/mood-trends`, { headers: getHeaders(true) });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  return {
+    success: true as const,
+    data: (flat.data ?? flat) as {
+      totalCheckIns: number;
+      moodBreakdown: { mood: string; count: number; percentage: number }[];
+    },
+  };
+}
+
+// ——— System Audit Trail —————————————————————————————————─────────────────
+
+export type AuditLogRow = {
+  _id: string;
+  adminEmail: string;
+  adminName?: string;
+  action: string;
+  targetModel?: string;
+  targetId?: string;
+  details?: Record<string, unknown>;
+  ipAddress?: string;
+  createdAt: string;
+};
+
+export async function fetchAuditLogs(params?: { page?: number; limit?: number; search?: string }) {
+  const sp = new URLSearchParams();
+  if (params?.page != null) sp.set("page", String(params.page));
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  if (params?.search != null && params.search.trim()) sp.set("search", params.search.trim());
+  const qs = sp.toString();
+  const res = await fetch(`${API_BASE}/api/admin/audit-logs${qs ? `?${qs}` : ""}`, { headers: getHeaders(true) });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  return {
+    success: true as const,
+    data: (flat.data ?? flat.items ?? []) as AuditLogRow[],
+    pagination: flat.pagination as PaginationMeta,
+  };
 }

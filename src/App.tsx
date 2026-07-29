@@ -22,12 +22,17 @@ import ProtectedRoute from "./components/auth/ProtectedRoute";
 import GuestRoute from "./components/auth/GuestRoute";
 import UserManagement from "./pages/UserManagement";
 import UserDetail from "./pages/UserDetail";
+import AdminStaffManagement from "./pages/AdminStaffManagement";
 import ContentManagement from "./pages/ContentManagement";
 import SupportManagement from "./pages/SupportManagement";
 import FaqManagement from "./pages/FaqManagement";
 import WebinarRegistrations from "./pages/WebinarRegistrations";
 import PushNotifications from "./pages/PushNotifications";
 import StoreManagement from "./pages/StoreManagement";
+import KnowledgeBaseManagement from "./pages/KnowledgeBaseManagement";
+import RewardsManagement from "./pages/RewardsManagement";
+import AnalyticsDashboard from "./pages/AnalyticsDashboard";
+import AuditLogs from "./pages/AuditLogs";
 
 export default function App() {
   return (
@@ -45,42 +50,136 @@ export default function App() {
           >
             <Route index path="/" element={<Home />} />
 
-            {/* Others Page */}
+            {/* AI & Analytics */}
+            <Route
+              path="/ai/knowledge-base"
+              element={
+                <ProtectedRoute permission="manage_content">
+                  <KnowledgeBaseManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analytics/emotional"
+              element={
+                <ProtectedRoute permission="manage_users">
+                  <AnalyticsDashboard />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Profile & Utility */}
             <Route path="/profile" element={<UserProfiles />} />
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/blank" element={<Blank />} />
 
-            {/* Forms */}
+            {/* Forms, Tables, Charts */}
             <Route path="/form-elements" element={<FormElements />} />
-
-            {/* Tables */}
             <Route path="/basic-tables" element={<BasicTables />} />
-
-            {/* Ui Elements */}
             <Route path="/alerts" element={<Alerts />} />
             <Route path="/avatars" element={<Avatars />} />
             <Route path="/badge" element={<Badges />} />
             <Route path="/buttons" element={<Buttons />} />
             <Route path="/images" element={<Images />} />
             <Route path="/videos" element={<Videos />} />
-
-            {/* Charts */}
             <Route path="/line-chart" element={<LineChart />} />
             <Route path="/bar-chart" element={<BarChart />} />
 
-            {/* User Management */}
-            <Route path="/users" element={<UserManagement />} />
-            <Route path="/users/:id" element={<UserDetail />} />
+            {/* User & Rewards Management */}
+            <Route
+              path="/users"
+              element={
+                <ProtectedRoute permission="manage_users">
+                  <UserManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/users/:id"
+              element={
+                <ProtectedRoute permission="manage_users">
+                  <UserDetail />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/users/rewards"
+              element={
+                <ProtectedRoute permission="manage_users">
+                  <RewardsManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin-users"
+              element={
+                <ProtectedRoute permission="manage_admins">
+                  <AdminStaffManagement />
+                </ProtectedRoute>
+              }
+            />
 
-            {/* Content (Vision & Mission) */}
-            <Route path="/content" element={<ContentManagement />} />
+            {/* Content Management */}
+            <Route
+              path="/content"
+              element={
+                <ProtectedRoute permission="manage_content">
+                  <ContentManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/store-management"
+              element={
+                <ProtectedRoute permission="manage_content">
+                  <StoreManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/push-notifications"
+              element={
+                <ProtectedRoute permission="manage_content">
+                  <PushNotifications />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/faq"
+              element={
+                <ProtectedRoute permission="manage_content">
+                  <FaqManagement />
+                </ProtectedRoute>
+              }
+            />
 
-            {/* Support & FAQ */}
-            <Route path="/support" element={<SupportManagement />} />
-            <Route path="/faq" element={<FaqManagement />} />
-            <Route path="/webinar" element={<WebinarRegistrations />} />
-            <Route path="/push-notifications" element={<PushNotifications />} />
-            <Route path="/store-management" element={<StoreManagement />} />
+            {/* Webinar Management */}
+            <Route
+              path="/webinar"
+              element={
+                <ProtectedRoute permission="manage_webinar">
+                  <WebinarRegistrations />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Support & Audit Trail */}
+            <Route
+              path="/support"
+              element={
+                <ProtectedRoute permission="manage_support">
+                  <SupportManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/system/logs"
+              element={
+                <ProtectedRoute permission="manage_admins">
+                  <AuditLogs />
+                </ProtectedRoute>
+              }
+            />
           </Route>
 
           {/* Auth — guest only */}
