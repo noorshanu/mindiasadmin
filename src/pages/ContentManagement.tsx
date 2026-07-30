@@ -171,7 +171,7 @@ export default function ContentManagement() {
     setError(null);
     try {
       const res = await uploadHomeHeroSlide(file, heroAlt || undefined);
-      if (Array.isArray(res.homeHeroSlides) && res.homeHeroSlides.length > 0) {
+      if (Array.isArray(res.homeHeroSlides)) {
         setHomeHeroSlides(res.homeHeroSlides);
       } else if (res.slide) {
         setHomeHeroSlides((prev) => {

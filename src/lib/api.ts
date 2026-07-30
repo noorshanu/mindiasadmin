@@ -1318,7 +1318,7 @@ export async function fetchAdminStaff() {
   const raw = await res.json();
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
-  const data = (flat.data ?? flat.items ?? []) as AdminUser[];
+  const data = (Array.isArray(flat.data) ? flat.data : Array.isArray(flat.items) ? flat.items : []) as AdminUser[];
   return { success: true as const, data };
 }
 
@@ -1404,7 +1404,7 @@ export async function fetchKnowledgeBase(params?: { page?: number; limit?: numbe
   const flat = unwrapBackendSuccess(raw);
   return {
     success: true as const,
-    data: (flat.data ?? flat.items ?? []) as KnowledgeBaseItem[],
+    data: (Array.isArray(flat.data) ? flat.data : Array.isArray(flat.items) ? flat.items : []) as KnowledgeBaseItem[],
     pagination: flat.pagination as PaginationMeta,
   };
 }
@@ -1477,7 +1477,7 @@ export async function fetchRewardsLeaderboard(params?: { page?: number; limit?: 
   const flat = unwrapBackendSuccess(raw);
   return {
     success: true as const,
-    data: (flat.data ?? flat.items ?? []) as UserRewardRow[],
+    data: (Array.isArray(flat.data) ? flat.data : Array.isArray(flat.items) ? flat.items : []) as UserRewardRow[],
     pagination: flat.pagination as PaginationMeta,
   };
 }
@@ -1555,7 +1555,7 @@ export async function fetchAuditLogs(params?: { page?: number; limit?: number; s
   const flat = unwrapBackendSuccess(raw);
   return {
     success: true as const,
-    data: (flat.data ?? flat.items ?? []) as AuditLogRow[],
+    data: (Array.isArray(flat.data) ? flat.data : Array.isArray(flat.items) ? flat.items : []) as AuditLogRow[],
     pagination: flat.pagination as PaginationMeta,
   };
 }
