@@ -1,13 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 import {
-  CalenderIcon,
-  ChevronDownIcon,
-  FileIcon,
-  GridIcon,
-  HorizontaLDots,
-  UserCircleIcon,
-} from "../icons";
+  LayoutDashboard,
+  PieChart,
+  BrainCircuit,
+  Users,
+  Award,
+  UserCog,
+  FileText,
+  Video,
+  LifeBuoy,
+  Activity,
+  User,
+  Calendar,
+  ChevronDown,
+  MoreHorizontal,
+} from "lucide-react";
 import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/AuthContext";
 
@@ -35,12 +43,12 @@ const navGroups: NavGroup[] = [
     groupLabel: "Overview",
     items: [
       {
-        icon: <GridIcon />,
+        icon: <LayoutDashboard className="size-5" />,
         name: "Dashboard",
         path: "/",
       },
       {
-        icon: <GridIcon />,
+        icon: <PieChart className="size-5" />,
         name: "Platform Analytics",
         path: "/analytics/emotional",
         permission: "manage_users",
@@ -51,7 +59,7 @@ const navGroups: NavGroup[] = [
     groupLabel: "AI & Intelligence",
     items: [
       {
-        icon: <FileIcon />,
+        icon: <BrainCircuit className="size-5" />,
         name: "RAG Knowledge Base",
         path: "/ai/knowledge-base",
         permission: "manage_content",
@@ -62,19 +70,19 @@ const navGroups: NavGroup[] = [
     groupLabel: "User Management",
     items: [
       {
-        icon: <UserCircleIcon />,
+        icon: <Users className="size-5" />,
         name: "App Users",
         path: "/users",
         permission: "manage_users",
       },
       {
-        icon: <UserCircleIcon />,
+        icon: <Award className="size-5" />,
         name: "Rewards & Streaks",
         path: "/users/rewards",
         permission: "manage_users",
       },
       {
-        icon: <UserCircleIcon />,
+        icon: <UserCog className="size-5" />,
         name: "Admin Staff & Roles",
         path: "/admin-users",
         permission: "manage_admins",
@@ -85,7 +93,7 @@ const navGroups: NavGroup[] = [
     groupLabel: "Content Management",
     items: [
       {
-        icon: <FileIcon />,
+        icon: <FileText className="size-5" />,
         name: "Content Management",
         permission: "manage_content",
         subItems: [
@@ -101,7 +109,7 @@ const navGroups: NavGroup[] = [
     groupLabel: "Webinar Management",
     items: [
       {
-        icon: <FileIcon />,
+        icon: <Video className="size-5" />,
         name: "Webinars",
         path: "/webinar",
         permission: "manage_webinar",
@@ -112,13 +120,13 @@ const navGroups: NavGroup[] = [
     groupLabel: "Support & Audit",
     items: [
       {
-        icon: <FileIcon />,
+        icon: <LifeBuoy className="size-5" />,
         name: "Support Messages",
         path: "/support",
         permission: "manage_support",
       },
       {
-        icon: <FileIcon />,
+        icon: <Activity className="size-5" />,
         name: "System Audit Trail",
         path: "/system/logs",
         permission: "manage_admins",
@@ -129,12 +137,12 @@ const navGroups: NavGroup[] = [
     groupLabel: "System & Profile",
     items: [
       {
-        icon: <UserCircleIcon />,
+        icon: <User className="size-5" />,
         name: "User Profile",
         path: "/profile",
       },
       {
-        icon: <CalenderIcon />,
+        icon: <Calendar className="size-5" />,
         name: "Calendar",
         path: "/calendar",
       },
@@ -258,7 +266,7 @@ export default function AppSidebar() {
                   {isExpanded || isHovered || isMobileOpen ? (
                     group.groupLabel
                   ) : (
-                    <HorizontaLDots className="size-5" />
+                    <MoreHorizontal className="size-5" />
                   )}
                 </h2>
 
@@ -296,7 +304,7 @@ export default function AppSidebar() {
                                 <span className="menu-item-text font-medium">{nav.name}</span>
                               )}
                               {(isExpanded || isHovered || isMobileOpen) && (
-                                <ChevronDownIcon
+                                <ChevronDown
                                   className={`ml-auto w-4 h-4 transition-transform duration-200 ${
                                     isOpen ? "rotate-180 text-brand-500" : ""
                                   }`}
