@@ -810,7 +810,7 @@ export default function WebinarRegistrations() {
 
       {/* Create webinar modal */}
       {showCreate ? (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-999999 flex items-center justify-center bg-gray-900/45 backdrop-blur-md p-4">
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 dark:bg-gray-900">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white">Create webinar</h3>
             <p className="mt-1 text-sm text-gray-500">
@@ -892,7 +892,7 @@ export default function WebinarRegistrations() {
 
       {/* Edit webinar modal */}
       {editingEvent ? (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-999999 flex items-center justify-center bg-gray-900/45 backdrop-blur-md p-4">
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 dark:bg-gray-900">
             <h3 className="text-lg font-bold">Edit {editingEvent.title}</h3>
             <p className="mt-1 font-mono text-xs text-gray-500">key: {editingEvent.eventKey} (cannot change)</p>
@@ -984,7 +984,7 @@ export default function WebinarRegistrations() {
 
       {/* Packages modal */}
       {showPackages ? (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-999999 flex items-center justify-center bg-gray-900/45 backdrop-blur-md p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 dark:bg-gray-900">
             <h3 className="text-lg font-bold">Package prices (₹)</h3>
             <p className="mt-1 text-sm text-gray-500">These are the normal prices before any coupon.</p>
@@ -1032,7 +1032,7 @@ export default function WebinarRegistrations() {
 
       {/* Coupons modal — clearer copy */}
       {showCoupons ? (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-999999 flex items-center justify-center bg-gray-900/45 backdrop-blur-md p-4">
           <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-6 dark:bg-gray-900">
             <h3 className="text-lg font-bold">Coupon codes</h3>
             <div className="mt-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/30 dark:text-blue-100">
@@ -1160,7 +1160,7 @@ export default function WebinarRegistrations() {
 
       {/* Registration detail */}
       {selectedView ? (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-999999 flex items-center justify-center bg-gray-900/45 backdrop-blur-md p-4">
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 dark:bg-gray-900">
             <h3 className="text-lg font-bold">{selectedView.name}</h3>
             <dl className="mt-3 space-y-2 text-sm">
@@ -1199,7 +1199,7 @@ export default function WebinarRegistrations() {
       ) : null}
 
       {confirmDelete ? (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-999999 flex items-center justify-center bg-gray-900/45 backdrop-blur-md p-4">
           <div className="w-full max-w-sm rounded-2xl bg-white p-6 dark:bg-gray-900">
             <p className="text-sm text-gray-700 dark:text-gray-200">
               Delete registration for <strong>{confirmDelete.email}</strong>?

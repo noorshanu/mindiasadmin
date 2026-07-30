@@ -256,7 +256,7 @@ export default function KnowledgeBaseManagement() {
 
       {/* ADD KNOWLEDGE ITEM MODAL */}
       {isAddOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-999999 flex items-center justify-center bg-gray-900/45 backdrop-blur-md p-4 overflow-y-auto">
           <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-lg w-full p-6 space-y-6 shadow-xl border border-gray-200 dark:border-gray-800">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white">Add RAG Knowledge Snippet</h3>
             <form onSubmit={handleCreate} className="space-y-4">
