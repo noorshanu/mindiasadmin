@@ -12,6 +12,7 @@ import { useAuth } from "../context/AuthContext";
 import Button from "../components/ui/button/Button";
 import Input from "../components/form/input/InputField";
 import Label from "../components/form/Label";
+import { AdminDialog } from "../components/ui/modal/AdminDialog";
 
 type RolePreset = "super_admin" | "content_manager" | "user_manager" | "webinar_manager" | "custom";
 
@@ -363,199 +364,194 @@ export default function AdminStaffManagement() {
         </div>
       </div>
 
-      {/* ADD ADMIN MODAL */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 z-999999 flex items-center justify-center bg-gray-900/45 backdrop-blur-md p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-lg w-full p-6 space-y-6 shadow-xl border border-gray-200 dark:border-gray-800">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Create New Admin Account</h3>
-            <form onSubmit={handleCreateStaff} className="space-y-4">
-              <div>
-                <Label>Full Name</Label>
-                <Input value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="e.g. Sarah Connor" />
-              </div>
-              <div>
-                <Label>Email Address</Label>
-                <Input type="email" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} placeholder="sarah@mindsai.live" />
-              </div>
-              <div>
-                <Label>Password</Label>
-                <Input type="password" value={formPassword} onChange={(e) => setFormPassword(e.target.value)} placeholder="••••••••" />
-              </div>
-
-              {/* Role Preset Selector */}
-              <div>
-                <Label>Select Role Preset</Label>
-                <div className="grid grid-cols-2 gap-2 mt-1">
-                  {[
-                    { key: "super_admin", label: "Super Admin", desc: "Full access to all sections" },
-                    { key: "content_manager", label: "Content Manager", desc: "App content & products" },
-                    { key: "user_manager", label: "User Manager", desc: "Users & chat history" },
-                    { key: "webinar_manager", label: "Webinar Manager", desc: "Webinars & coupons" },
-                  ].map((p) => (
-                    <button
-                      key={p.key}
-                      type="button"
-                      onClick={() => handlePresetSelect(p.key as RolePreset)}
-                      className={`p-3 rounded-xl text-left border text-xs transition ${
-                        formPreset === p.key
-                          ? "border-brand-500 bg-brand-50/50 dark:bg-brand-950/40 text-brand-700 dark:text-brand-300 font-semibold"
-                          : "border-gray-200 dark:border-gray-700 hover:border-gray-300 text-gray-700 dark:text-gray-300"
-                      }`}
-                    >
-                      <div className="font-bold">{p.label}</div>
-                      <div className="text-[10px] text-gray-500 mt-0.5">{p.desc}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Custom Permission Checkboxes */}
-              <div>
-                <Label>Module Access Rights</Label>
-                <div className="space-y-2 mt-1 bg-gray-50 dark:bg-gray-800/40 p-3 rounded-xl border border-gray-200 dark:border-gray-700">
-                  {MODULE_LIST.map((m) => (
-                    <label key={m.key} className="flex items-start gap-2.5 cursor-pointer text-xs">
-                      <input
-                        type="checkbox"
-                        checked={formPreset === "super_admin" || formPermissions.includes(m.key)}
-                        disabled={formPreset === "super_admin"}
-                        onChange={() => handlePermissionToggle(m.key)}
-                        className="mt-0.5 rounded text-brand-600 focus:ring-brand-500"
-                      />
-                      <div>
-                        <span className="font-medium text-gray-900 dark:text-white">{m.label}</span>
-                        <p className="text-[10px] text-gray-500">{m.desc}</p>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Can Add Users Switch */}
-              <div className="pt-2">
-                <label className="flex items-center justify-between p-3 rounded-xl border border-gray-200 dark:border-gray-700 cursor-pointer bg-gray-50/50 dark:bg-gray-800/40">
-                  <div>
-                    <span className="text-xs font-bold text-gray-900 dark:text-white">Can add other admin users?</span>
-                    <p className="text-[10px] text-gray-500">Allow this user to create new admin staff accounts</p>
-                  </div>
+      <AdminDialog
+        open={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        title="Create new admin account"
+        description="Choose a role preset or customize module access."
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={() => setIsAddModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="add-admin-form"
+              disabled={submitting}
+              className="bg-brand-500 hover:bg-brand-600 text-white"
+            >
+              {submitting ? "Creating..." : "Create Admin Account"}
+            </Button>
+          </>
+        }
+      >
+        <form id="add-admin-form" onSubmit={handleCreateStaff} className="space-y-4">
+          <div>
+            <Label>Full Name</Label>
+            <Input value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="e.g. Sarah Connor" />
+          </div>
+          <div>
+            <Label>Email Address</Label>
+            <Input type="email" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} placeholder="sarah@mindsai.live" />
+          </div>
+          <div>
+            <Label>Password</Label>
+            <Input type="password" value={formPassword} onChange={(e) => setFormPassword(e.target.value)} placeholder="••••••••" />
+          </div>
+          <div>
+            <Label>Select Role Preset</Label>
+            <div className="mt-1 grid grid-cols-2 gap-2">
+              {[
+                { key: "super_admin", label: "Super Admin", desc: "Full access to all sections" },
+                { key: "content_manager", label: "Content Manager", desc: "App content & products" },
+                { key: "user_manager", label: "User Manager", desc: "Users & chat history" },
+                { key: "webinar_manager", label: "Webinar Manager", desc: "Webinars & coupons" },
+              ].map((p) => (
+                <button
+                  key={p.key}
+                  type="button"
+                  onClick={() => handlePresetSelect(p.key as RolePreset)}
+                  className={`rounded-xl border p-3 text-left text-xs transition ${
+                    formPreset === p.key
+                      ? "border-brand-500 bg-brand-50/50 font-semibold text-brand-700 dark:bg-brand-950/40 dark:text-brand-300"
+                      : "border-gray-200 text-gray-700 hover:border-gray-300 dark:border-gray-700 dark:text-gray-300"
+                  }`}
+                >
+                  <div className="font-bold">{p.label}</div>
+                  <div className="mt-0.5 text-[10px] text-gray-500">{p.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <Label>Module Access Rights</Label>
+            <div className="mt-1 space-y-2 rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/40">
+              {MODULE_LIST.map((m) => (
+                <label key={m.key} className="flex cursor-pointer items-start gap-2.5 text-xs">
                   <input
                     type="checkbox"
-                    checked={formPreset === "super_admin" || formCanAddUsers}
+                    checked={formPreset === "super_admin" || formPermissions.includes(m.key)}
                     disabled={formPreset === "super_admin"}
-                    onChange={(e) => {
-                      setFormPreset("custom");
-                      setFormCanAddUsers(e.target.checked);
-                    }}
-                    className="w-4 h-4 text-brand-600 rounded"
+                    onChange={() => handlePermissionToggle(m.key)}
+                    className="mt-0.5 rounded text-brand-600 focus:ring-brand-500"
                   />
-                </label>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-800">
-                <Button type="button" variant="outline" onClick={() => setIsAddModalOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={submitting} className="bg-brand-500 hover:bg-brand-600 text-white">
-                  {submitting ? "Creating..." : "Create Admin Account"}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* EDIT ADMIN MODAL */}
-      {editingStaff && (
-        <div className="fixed inset-0 z-999999 flex items-center justify-center bg-gray-900/45 backdrop-blur-md p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-lg w-full p-6 space-y-6 shadow-xl border border-gray-200 dark:border-gray-800">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Edit Admin Role & Permissions</h3>
-            <form onSubmit={handleUpdateStaff} className="space-y-4">
-              <div>
-                <Label>Full Name</Label>
-                <Input value={formName} onChange={(e) => setFormName(e.target.value)} />
-              </div>
-
-              {/* Role Preset Selector */}
-              <div>
-                <Label>Select Role Preset</Label>
-                <div className="grid grid-cols-2 gap-2 mt-1">
-                  {[
-                    { key: "super_admin", label: "Super Admin", desc: "Full access to all sections" },
-                    { key: "content_manager", label: "Content Manager", desc: "App content & products" },
-                    { key: "user_manager", label: "User Manager", desc: "Users & chat history" },
-                    { key: "webinar_manager", label: "Webinar Manager", desc: "Webinars & coupons" },
-                  ].map((p) => (
-                    <button
-                      key={p.key}
-                      type="button"
-                      onClick={() => handlePresetSelect(p.key as RolePreset)}
-                      className={`p-3 rounded-xl text-left border text-xs transition ${
-                        formPreset === p.key
-                          ? "border-brand-500 bg-brand-50/50 dark:bg-brand-950/40 text-brand-700 dark:text-brand-300 font-semibold"
-                          : "border-gray-200 dark:border-gray-700 hover:border-gray-300 text-gray-700 dark:text-gray-300"
-                      }`}
-                    >
-                      <div className="font-bold">{p.label}</div>
-                      <div className="text-[10px] text-gray-500 mt-0.5">{p.desc}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Custom Permission Checkboxes */}
-              <div>
-                <Label>Module Access Rights</Label>
-                <div className="space-y-2 mt-1 bg-gray-50 dark:bg-gray-800/40 p-3 rounded-xl border border-gray-200 dark:border-gray-700">
-                  {MODULE_LIST.map((m) => (
-                    <label key={m.key} className="flex items-start gap-2.5 cursor-pointer text-xs">
-                      <input
-                        type="checkbox"
-                        checked={formPreset === "super_admin" || formPermissions.includes(m.key)}
-                        disabled={formPreset === "super_admin"}
-                        onChange={() => handlePermissionToggle(m.key)}
-                        className="mt-0.5 rounded text-brand-600 focus:ring-brand-500"
-                      />
-                      <div>
-                        <span className="font-medium text-gray-900 dark:text-white">{m.label}</span>
-                        <p className="text-[10px] text-gray-500">{m.desc}</p>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Can Add Users Switch */}
-              <div className="pt-2">
-                <label className="flex items-center justify-between p-3 rounded-xl border border-gray-200 dark:border-gray-700 cursor-pointer bg-gray-50/50 dark:bg-gray-800/40">
                   <div>
-                    <span className="text-xs font-bold text-gray-900 dark:text-white">Can add other admin users?</span>
-                    <p className="text-[10px] text-gray-500">Allow this user to create new admin staff accounts</p>
+                    <span className="font-medium text-gray-900 dark:text-white">{m.label}</span>
+                    <p className="text-[10px] text-gray-500">{m.desc}</p>
                   </div>
+                </label>
+              ))}
+            </div>
+          </div>
+          <label className="flex cursor-pointer items-center justify-between rounded-xl border border-gray-200 bg-gray-50/50 p-3 dark:border-gray-700 dark:bg-gray-800/40">
+            <div>
+              <span className="text-xs font-bold text-gray-900 dark:text-white">Can add other admin users?</span>
+              <p className="text-[10px] text-gray-500">Allow this user to create new admin staff accounts</p>
+            </div>
+            <input
+              type="checkbox"
+              checked={formPreset === "super_admin" || formCanAddUsers}
+              disabled={formPreset === "super_admin"}
+              onChange={(e) => {
+                setFormPreset("custom");
+                setFormCanAddUsers(e.target.checked);
+              }}
+              className="h-4 w-4 rounded text-brand-600"
+            />
+          </label>
+        </form>
+      </AdminDialog>
+
+      <AdminDialog
+        open={!!editingStaff}
+        onClose={() => setEditingStaff(null)}
+        title="Edit admin role & permissions"
+        description={editingStaff?.email}
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={() => setEditingStaff(null)}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="edit-admin-form"
+              disabled={submitting}
+              className="bg-brand-500 hover:bg-brand-600 text-white"
+            >
+              {submitting ? "Saving..." : "Save Changes"}
+            </Button>
+          </>
+        }
+      >
+        <form id="edit-admin-form" onSubmit={handleUpdateStaff} className="space-y-4">
+          <div>
+            <Label>Full Name</Label>
+            <Input value={formName} onChange={(e) => setFormName(e.target.value)} />
+          </div>
+          <div>
+            <Label>Select Role Preset</Label>
+            <div className="mt-1 grid grid-cols-2 gap-2">
+              {[
+                { key: "super_admin", label: "Super Admin", desc: "Full access to all sections" },
+                { key: "content_manager", label: "Content Manager", desc: "App content & products" },
+                { key: "user_manager", label: "User Manager", desc: "Users & chat history" },
+                { key: "webinar_manager", label: "Webinar Manager", desc: "Webinars & coupons" },
+              ].map((p) => (
+                <button
+                  key={p.key}
+                  type="button"
+                  onClick={() => handlePresetSelect(p.key as RolePreset)}
+                  className={`rounded-xl border p-3 text-left text-xs transition ${
+                    formPreset === p.key
+                      ? "border-brand-500 bg-brand-50/50 font-semibold text-brand-700 dark:bg-brand-950/40 dark:text-brand-300"
+                      : "border-gray-200 text-gray-700 hover:border-gray-300 dark:border-gray-700 dark:text-gray-300"
+                  }`}
+                >
+                  <div className="font-bold">{p.label}</div>
+                  <div className="mt-0.5 text-[10px] text-gray-500">{p.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <Label>Module Access Rights</Label>
+            <div className="mt-1 space-y-2 rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/40">
+              {MODULE_LIST.map((m) => (
+                <label key={m.key} className="flex cursor-pointer items-start gap-2.5 text-xs">
                   <input
                     type="checkbox"
-                    checked={formPreset === "super_admin" || formCanAddUsers}
+                    checked={formPreset === "super_admin" || formPermissions.includes(m.key)}
                     disabled={formPreset === "super_admin"}
-                    onChange={(e) => {
-                      setFormPreset("custom");
-                      setFormCanAddUsers(e.target.checked);
-                    }}
-                    className="w-4 h-4 text-brand-600 rounded"
+                    onChange={() => handlePermissionToggle(m.key)}
+                    className="mt-0.5 rounded text-brand-600 focus:ring-brand-500"
                   />
+                  <div>
+                    <span className="font-medium text-gray-900 dark:text-white">{m.label}</span>
+                    <p className="text-[10px] text-gray-500">{m.desc}</p>
+                  </div>
                 </label>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-800">
-                <Button type="button" variant="outline" onClick={() => setEditingStaff(null)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={submitting} className="bg-brand-500 hover:bg-brand-600 text-white">
-                  {submitting ? "Saving..." : "Save Changes"}
-                </Button>
-              </div>
-            </form>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+          <label className="flex cursor-pointer items-center justify-between rounded-xl border border-gray-200 bg-gray-50/50 p-3 dark:border-gray-700 dark:bg-gray-800/40">
+            <div>
+              <span className="text-xs font-bold text-gray-900 dark:text-white">Can add other admin users?</span>
+              <p className="text-[10px] text-gray-500">Allow this user to create new admin staff accounts</p>
+            </div>
+            <input
+              type="checkbox"
+              checked={formPreset === "super_admin" || formCanAddUsers}
+              disabled={formPreset === "super_admin"}
+              onChange={(e) => {
+                setFormPreset("custom");
+                setFormCanAddUsers(e.target.checked);
+              }}
+              className="h-4 w-4 rounded text-brand-600"
+            />
+          </label>
+        </form>
+      </AdminDialog>
+
     </>
   );
 }

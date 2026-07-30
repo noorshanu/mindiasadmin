@@ -21,6 +21,7 @@ import {
 } from "../lib/api";
 import Button from "../components/ui/button/Button";
 import Input from "../components/form/input/InputField";
+import { AdminDialog } from "../components/ui/modal/AdminDialog";
 
 type PaidFilter = "all" | "paid" | "unpaid";
 type PackageFilter = "all" | "basic" | "pro" | "premium";
@@ -809,412 +810,447 @@ export default function WebinarRegistrations() {
       </div>
 
       {/* Create webinar modal */}
-      {showCreate ? (
-        <div className="fixed inset-0 z-999999 flex items-center justify-center bg-gray-900/45 backdrop-blur-md p-4">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 dark:bg-gray-900">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Create webinar</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              Creates a new event key. Old webinar emails can register again once this one is active.
-            </p>
-            {mustCloseFirst ? (
-              <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
-                <strong>{openEvent?.title}</strong> still has open registration. Close it first, then you can
-                activate a new webinar. You can still create this one as a <em>draft</em> now.
-              </div>
-            ) : null}
-            <div className="mt-4 space-y-3">
-              <label className="block text-sm">
-                Title
-                <Input
-                  value={createForm.title}
-                  onChange={(e) => setCreateForm((p) => ({ ...p, title: e.target.value }))}
-                  placeholder="Webinar 2"
-                  className="mt-1"
-                />
-              </label>
-              <label className="block text-sm">
-                Description (optional)
-                <Input
-                  value={createForm.description}
-                  onChange={(e) => setCreateForm((p) => ({ ...p, description: e.target.value }))}
-                  className="mt-1"
-                />
-              </label>
-              <label className="block text-sm">
-                Webinar starts
-                <Input
-                  type="datetime-local"
-                  value={createForm.startsAt}
-                  onChange={(e) => setCreateForm((p) => ({ ...p, startsAt: e.target.value }))}
-                  className="mt-1"
-                />
-              </label>
-              <label className="block text-sm">
-                Registration opens
-                <Input
-                  type="datetime-local"
-                  value={createForm.registrationOpensAt}
-                  onChange={(e) => setCreateForm((p) => ({ ...p, registrationOpensAt: e.target.value }))}
-                  className="mt-1"
-                />
-              </label>
-              <label className="block text-sm">
-                Registration closes
-                <Input
-                  type="datetime-local"
-                  value={createForm.registrationClosesAt}
-                  onChange={(e) => setCreateForm((p) => ({ ...p, registrationClosesAt: e.target.value }))}
-                  className="mt-1"
-                />
-              </label>
-              <label className={`flex items-center gap-2 text-sm ${mustCloseFirst ? "opacity-60" : ""}`}>
-                <input
-                  type="checkbox"
-                  checked={createForm.activate && !mustCloseFirst}
-                  disabled={mustCloseFirst}
-                  onChange={(e) => setCreateForm((p) => ({ ...p, activate: e.target.checked }))}
-                />
-                Make this the active webinar for new signups now
-                {mustCloseFirst ? " (disabled until you close the open webinar)" : ""}
-              </label>
-            </div>
-            <div className="mt-5 flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => setShowCreate(false)}>
-                Cancel
-              </Button>
-              <Button size="sm" disabled={saving || !createForm.title.trim()} onClick={() => void handleCreateWebinar()}>
-                {saving ? "Creating…" : "Create"}
-              </Button>
-            </div>
+      <AdminDialog
+        open={showCreate}
+        onClose={() => setShowCreate(false)}
+        title="Create webinar"
+        description="Creates a new event key. Old webinar emails can register again once this one is active."
+        footer={
+          <>
+            <Button variant="outline" size="sm" onClick={() => setShowCreate(false)}>
+              Cancel
+            </Button>
+            <Button size="sm" disabled={saving || !createForm.title.trim()} onClick={() => void handleCreateWebinar()}>
+              {saving ? "Creating…" : "Create"}
+            </Button>
+          </>
+        }
+      >
+        {mustCloseFirst ? (
+          <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
+            <strong>{openEvent?.title}</strong> still has open registration. Close it first, then you can
+            activate a new webinar. You can still create this one as a <em>draft</em> now.
           </div>
+        ) : null}
+        <div className="space-y-3">
+          <label className="block text-sm">
+            Title
+            <Input
+              value={createForm.title}
+              onChange={(e) => setCreateForm((p) => ({ ...p, title: e.target.value }))}
+              placeholder="Webinar 2"
+              className="mt-1"
+            />
+          </label>
+          <label className="block text-sm">
+            Description (optional)
+            <Input
+              value={createForm.description}
+              onChange={(e) => setCreateForm((p) => ({ ...p, description: e.target.value }))}
+              className="mt-1"
+            />
+          </label>
+          <label className="block text-sm">
+            Webinar starts
+            <Input
+              type="datetime-local"
+              value={createForm.startsAt}
+              onChange={(e) => setCreateForm((p) => ({ ...p, startsAt: e.target.value }))}
+              className="mt-1"
+            />
+          </label>
+          <label className="block text-sm">
+            Registration opens
+            <Input
+              type="datetime-local"
+              value={createForm.registrationOpensAt}
+              onChange={(e) => setCreateForm((p) => ({ ...p, registrationOpensAt: e.target.value }))}
+              className="mt-1"
+            />
+          </label>
+          <label className="block text-sm">
+            Registration closes
+            <Input
+              type="datetime-local"
+              value={createForm.registrationClosesAt}
+              onChange={(e) => setCreateForm((p) => ({ ...p, registrationClosesAt: e.target.value }))}
+              className="mt-1"
+            />
+          </label>
+          <label className={`flex items-center gap-2 text-sm ${mustCloseFirst ? "opacity-60" : ""}`}>
+            <input
+              type="checkbox"
+              checked={createForm.activate && !mustCloseFirst}
+              disabled={mustCloseFirst}
+              onChange={(e) => setCreateForm((p) => ({ ...p, activate: e.target.checked }))}
+            />
+            Make this the active webinar for new signups now
+            {mustCloseFirst ? " (disabled until you close the open webinar)" : ""}
+          </label>
         </div>
-      ) : null}
+      </AdminDialog>
 
       {/* Edit webinar modal */}
-      {editingEvent ? (
-        <div className="fixed inset-0 z-999999 flex items-center justify-center bg-gray-900/45 backdrop-blur-md p-4">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 dark:bg-gray-900">
-            <h3 className="text-lg font-bold">Edit {editingEvent.title}</h3>
-            <p className="mt-1 font-mono text-xs text-gray-500">key: {editingEvent.eventKey} (cannot change)</p>
-            <div className="mt-4 space-y-3">
-              <label className="block text-sm">
-                Title
-                <Input
-                  value={editingEvent.title}
-                  onChange={(e) => setEditingEvent({ ...editingEvent, title: e.target.value })}
-                  className="mt-1"
-                />
-              </label>
-              <label className="block text-sm">
-                Description
-                <Input
-                  value={editingEvent.description || ""}
-                  onChange={(e) => setEditingEvent({ ...editingEvent, description: e.target.value })}
-                  className="mt-1"
-                />
-              </label>
-              <label className="block text-sm">
-                Status
-                <select
-                  value={editingEvent.status}
-                  onChange={(e) =>
-                    setEditingEvent({
-                      ...editingEvent,
-                      status: e.target.value as WebinarEventCard["status"],
-                    })
-                  }
-                  className="mt-1 h-10 w-full rounded-lg border border-gray-200 px-3 dark:border-gray-700 dark:bg-gray-800"
-                >
-                  <option value="draft">draft</option>
-                  <option value="open">open</option>
-                  <option value="closed">closed</option>
-                </select>
-              </label>
-              <label className="block text-sm">
-                Webinar starts
-                <Input
-                  type="datetime-local"
-                  value={toLocalInputValue(editingEvent.startsAt)}
-                  onChange={(e) =>
-                    setEditingEvent({ ...editingEvent, startsAt: fromLocalInputValue(e.target.value) })
-                  }
-                  className="mt-1"
-                />
-              </label>
-              <label className="block text-sm">
-                Registration opens
-                <Input
-                  type="datetime-local"
-                  value={toLocalInputValue(editingEvent.registrationOpensAt)}
-                  onChange={(e) =>
-                    setEditingEvent({
-                      ...editingEvent,
-                      registrationOpensAt: fromLocalInputValue(e.target.value),
-                    })
-                  }
-                  className="mt-1"
-                />
-              </label>
-              <label className="block text-sm">
-                Registration closes
-                <Input
-                  type="datetime-local"
-                  value={toLocalInputValue(editingEvent.registrationClosesAt)}
-                  onChange={(e) =>
-                    setEditingEvent({
-                      ...editingEvent,
-                      registrationClosesAt: fromLocalInputValue(e.target.value),
-                    })
-                  }
-                  className="mt-1"
-                />
-              </label>
-            </div>
-            <div className="mt-5 flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => setEditingEvent(null)}>
-                Cancel
-              </Button>
-              <Button size="sm" disabled={saving} onClick={() => void handleSaveEditEvent()}>
-                Save
-              </Button>
-            </div>
+      <AdminDialog
+        open={!!editingEvent}
+        onClose={() => setEditingEvent(null)}
+        title={editingEvent ? `Edit ${editingEvent.title}` : "Edit webinar"}
+        description={editingEvent ? `key: ${editingEvent.eventKey} (cannot change)` : undefined}
+        footer={
+          <>
+            <Button variant="outline" size="sm" onClick={() => setEditingEvent(null)}>
+              Cancel
+            </Button>
+            <Button size="sm" disabled={saving || !editingEvent} onClick={() => void handleSaveEditEvent()}>
+              Save
+            </Button>
+          </>
+        }
+      >
+        {editingEvent ? (
+          <div className="space-y-3">
+            <label className="block text-sm">
+              Title
+              <Input
+                value={editingEvent.title}
+                onChange={(e) => setEditingEvent({ ...editingEvent, title: e.target.value })}
+                className="mt-1"
+              />
+            </label>
+            <label className="block text-sm">
+              Description
+              <Input
+                value={editingEvent.description || ""}
+                onChange={(e) => setEditingEvent({ ...editingEvent, description: e.target.value })}
+                className="mt-1"
+              />
+            </label>
+            <label className="block text-sm">
+              Status
+              <select
+                value={editingEvent.status}
+                onChange={(e) =>
+                  setEditingEvent({
+                    ...editingEvent,
+                    status: e.target.value as WebinarEventCard["status"],
+                  })
+                }
+                className="mt-1 h-10 w-full rounded-lg border border-gray-200 px-3 dark:border-gray-700 dark:bg-gray-800"
+              >
+                <option value="draft">draft</option>
+                <option value="open">open</option>
+                <option value="closed">closed</option>
+              </select>
+            </label>
+            <label className="block text-sm">
+              Webinar starts
+              <Input
+                type="datetime-local"
+                value={toLocalInputValue(editingEvent.startsAt)}
+                onChange={(e) =>
+                  setEditingEvent({ ...editingEvent, startsAt: fromLocalInputValue(e.target.value) })
+                }
+                className="mt-1"
+              />
+            </label>
+            <label className="block text-sm">
+              Registration opens
+              <Input
+                type="datetime-local"
+                value={toLocalInputValue(editingEvent.registrationOpensAt)}
+                onChange={(e) =>
+                  setEditingEvent({
+                    ...editingEvent,
+                    registrationOpensAt: fromLocalInputValue(e.target.value),
+                  })
+                }
+                className="mt-1"
+              />
+            </label>
+            <label className="block text-sm">
+              Registration closes
+              <Input
+                type="datetime-local"
+                value={toLocalInputValue(editingEvent.registrationClosesAt)}
+                onChange={(e) =>
+                  setEditingEvent({
+                    ...editingEvent,
+                    registrationClosesAt: fromLocalInputValue(e.target.value),
+                  })
+                }
+                className="mt-1"
+              />
+            </label>
           </div>
-        </div>
-      ) : null}
+        ) : null}
+      </AdminDialog>
 
       {/* Packages modal */}
-      {showPackages ? (
-        <div className="fixed inset-0 z-999999 flex items-center justify-center bg-gray-900/45 backdrop-blur-md p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 dark:bg-gray-900">
-            <h3 className="text-lg font-bold">Package prices (₹)</h3>
-            <p className="mt-1 text-sm text-gray-500">These are the normal prices before any coupon.</p>
-            <div className="mt-4 space-y-3">
-              {packages.map((pkg, idx) => (
-                <div key={pkg.id} className="flex items-center gap-3">
-                  <span className="w-24 capitalize text-sm font-medium">{pkg.id}</span>
-                  <Input
-                    type="number"
-                    value={Math.round(pkg.amountPaise / 100)}
-                    onChange={(e) => {
-                      const rupees = Math.max(1, Number(e.target.value) || 1);
-                      setPackages((prev) =>
-                        prev.map((p, i) => (i === idx ? { ...p, amountPaise: rupees * 100 } : p)),
-                      );
-                    }}
-                    className="flex-1"
-                  />
-                  <label className="flex items-center gap-1 text-xs">
-                    <input
-                      type="checkbox"
-                      checked={pkg.active !== false}
-                      onChange={(e) =>
-                        setPackages((prev) =>
-                          prev.map((p, i) => (i === idx ? { ...p, active: e.target.checked } : p)),
-                        )
-                      }
-                    />
-                    Active
-                  </label>
-                </div>
-              ))}
+      <AdminDialog
+        open={showPackages}
+        onClose={() => setShowPackages(false)}
+        title="Package prices (₹)"
+        description="These are the normal prices before any coupon."
+        maxWidthClass="max-w-md"
+        footer={
+          <>
+            <Button variant="outline" size="sm" onClick={() => setShowPackages(false)}>
+              Close
+            </Button>
+            <Button size="sm" disabled={saving} onClick={() => void handleSavePackages()}>
+              Save prices
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          {packages.map((pkg, idx) => (
+            <div key={pkg.id} className="flex items-center gap-3">
+              <span className="w-24 text-sm font-medium capitalize">{pkg.id}</span>
+              <Input
+                type="number"
+                value={Math.round(pkg.amountPaise / 100)}
+                onChange={(e) => {
+                  const rupees = Math.max(1, Number(e.target.value) || 1);
+                  setPackages((prev) =>
+                    prev.map((p, i) => (i === idx ? { ...p, amountPaise: rupees * 100 } : p)),
+                  );
+                }}
+                className="flex-1"
+              />
+              <label className="flex items-center gap-1 text-xs">
+                <input
+                  type="checkbox"
+                  checked={pkg.active !== false}
+                  onChange={(e) =>
+                    setPackages((prev) =>
+                      prev.map((p, i) => (i === idx ? { ...p, active: e.target.checked } : p)),
+                    )
+                  }
+                />
+                Active
+              </label>
             </div>
-            <div className="mt-5 flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => setShowPackages(false)}>
-                Close
-              </Button>
-              <Button size="sm" disabled={saving} onClick={() => void handleSavePackages()}>
-                Save prices
-              </Button>
-            </div>
-          </div>
+          ))}
         </div>
-      ) : null}
+      </AdminDialog>
 
       {/* Coupons modal — clearer copy */}
-      {showCoupons ? (
-        <div className="fixed inset-0 z-999999 flex items-center justify-center bg-gray-900/45 backdrop-blur-md p-4">
-          <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-6 dark:bg-gray-900">
-            <h3 className="text-lg font-bold">Coupon codes</h3>
-            <div className="mt-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/30 dark:text-blue-100">
-              <p className="font-semibold">How coupons work</p>
-              <ol className="mt-1 list-decimal space-y-1 pl-4 text-xs sm:text-sm">
-                <li>User picks a package on the public form (Basic / Pro / Premium).</li>
-                <li>They enter your coupon code (e.g. <code className="rounded bg-white/70 px-1">LAUNCH50</code>).</li>
-                <li>
-                  The amounts below are the <strong>final price in ₹</strong> they pay for each package — not a % off.
-                </li>
-                <li>Example: Basic normally ₹99 → set Basic to ₹49 under the coupon → they pay ₹49.</li>
-              </ol>
-            </div>
-
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <label className="block text-sm sm:col-span-2">
-                Coupon code
-                <Input
-                  value={couponCodeInput}
-                  onChange={(e) => setCouponCodeInput(e.target.value.toUpperCase())}
-                  placeholder="LAUNCH50"
-                  className="mt-1"
-                />
-              </label>
-              <label className="block text-sm">
-                Final Basic ₹
-                <Input
-                  type="number"
-                  value={couponBasicRupees}
-                  onChange={(e) => setCouponBasicRupees(Number(e.target.value) || 1)}
-                  className="mt-1"
-                />
-              </label>
-              <label className="block text-sm">
-                Final Pro ₹
-                <Input
-                  type="number"
-                  value={couponProRupees}
-                  onChange={(e) => setCouponProRupees(Number(e.target.value) || 1)}
-                  className="mt-1"
-                />
-              </label>
-              <label className="block text-sm">
-                Final Premium ₹
-                <Input
-                  type="number"
-                  value={couponPremiumRupees}
-                  onChange={(e) => setCouponPremiumRupees(Number(e.target.value) || 1)}
-                  className="mt-1"
-                />
-              </label>
-              <label className="block text-sm">
-                Max uses (optional)
-                <Input
-                  type="number"
-                  value={couponMaxUses}
-                  onChange={(e) => setCouponMaxUses(e.target.value)}
-                  placeholder="Unlimited"
-                  className="mt-1"
-                />
-              </label>
-              <label className="block text-sm sm:col-span-2">
-                Expires at (optional)
-                <Input
-                  type="datetime-local"
-                  value={couponExpiresAt}
-                  onChange={(e) => setCouponExpiresAt(e.target.value)}
-                  className="mt-1"
-                />
-              </label>
-              <label className="flex items-center gap-2 text-sm sm:col-span-2">
-                <input type="checkbox" checked={couponActive} onChange={(e) => setCouponActive(e.target.checked)} />
-                Active (users can use it)
-              </label>
-            </div>
-            <div className="mt-3 flex justify-end">
-              <Button size="sm" disabled={saving || !couponCodeInput.trim()} onClick={() => void handleSaveCoupon()}>
-                {saving ? "Saving…" : "Save coupon"}
-              </Button>
-            </div>
-
-            <h4 className="mt-6 text-sm font-semibold text-gray-800 dark:text-white">Existing coupons</h4>
-            <ul className="mt-2 space-y-2">
-              {coupons.length === 0 ? <li className="text-sm text-gray-500">No coupons yet.</li> : null}
-              {coupons.map((c) => (
-                <li
-                  key={c.code}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-100 px-3 py-2 text-sm dark:border-gray-800"
-                >
-                  <div>
-                    <p className="font-semibold">{c.code}</p>
-                    <p className="text-xs text-gray-500">
-                      Final ₹ — Basic {Math.round((c.amountPaiseByPackage.basic ?? 0) / 100) || "—"} · Pro{" "}
-                      {Math.round((c.amountPaiseByPackage.pro ?? 0) / 100) || "—"} · Premium{" "}
-                      {Math.round((c.amountPaiseByPackage.premium ?? 0) / 100) || "—"}
-                      {" · "}used {c.usedCount}
-                      {c.maxUses != null ? `/${c.maxUses}` : ""}
-                      {!c.active ? " · inactive" : ""}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <button type="button" className="text-brand-500 hover:underline" onClick={() => handleEditCoupon(c)}>
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className="text-red-500 hover:underline"
-                      onClick={() => void handleDeleteCoupon(c.code)}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-
-            <div className="mt-5 flex justify-end">
-              <Button variant="outline" size="sm" onClick={() => setShowCoupons(false)}>
-                Close
-              </Button>
-            </div>
-          </div>
+      <AdminDialog
+        open={showCoupons}
+        onClose={() => setShowCoupons(false)}
+        title="Coupon codes"
+        description="Final ₹ amounts below are what the user pays for each package — not a % off."
+        maxWidthClass="max-w-xl"
+        footer={
+          <Button variant="outline" size="sm" onClick={() => setShowCoupons(false)}>
+            Close
+          </Button>
+        }
+      >
+        <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/30 dark:text-blue-100">
+          <p className="font-semibold">How coupons work</p>
+          <ol className="mt-1 list-decimal space-y-1 pl-4 text-xs sm:text-sm">
+            <li>User picks a package on the public form (Basic / Pro / Premium).</li>
+            <li>
+              They enter your coupon code (e.g. <code className="rounded bg-white/70 px-1">LAUNCH50</code>).
+            </li>
+            <li>
+              The amounts below are the <strong>final price in ₹</strong> they pay for each package — not a % off.
+            </li>
+            <li>Example: Basic normally ₹99 → set Basic to ₹49 under the coupon → they pay ₹49.</li>
+          </ol>
         </div>
-      ) : null}
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <label className="block text-sm sm:col-span-2">
+            Coupon code
+            <Input
+              value={couponCodeInput}
+              onChange={(e) => setCouponCodeInput(e.target.value.toUpperCase())}
+              placeholder="LAUNCH50"
+              className="mt-1"
+            />
+          </label>
+          <label className="block text-sm">
+            Final Basic ₹
+            <Input
+              type="number"
+              value={couponBasicRupees}
+              onChange={(e) => setCouponBasicRupees(Number(e.target.value) || 1)}
+              className="mt-1"
+            />
+          </label>
+          <label className="block text-sm">
+            Final Pro ₹
+            <Input
+              type="number"
+              value={couponProRupees}
+              onChange={(e) => setCouponProRupees(Number(e.target.value) || 1)}
+              className="mt-1"
+            />
+          </label>
+          <label className="block text-sm">
+            Final Premium ₹
+            <Input
+              type="number"
+              value={couponPremiumRupees}
+              onChange={(e) => setCouponPremiumRupees(Number(e.target.value) || 1)}
+              className="mt-1"
+            />
+          </label>
+          <label className="block text-sm">
+            Max uses (optional)
+            <Input
+              type="number"
+              value={couponMaxUses}
+              onChange={(e) => setCouponMaxUses(e.target.value)}
+              placeholder="Unlimited"
+              className="mt-1"
+            />
+          </label>
+          <label className="block text-sm sm:col-span-2">
+            Expires at (optional)
+            <Input
+              type="datetime-local"
+              value={couponExpiresAt}
+              onChange={(e) => setCouponExpiresAt(e.target.value)}
+              className="mt-1"
+            />
+          </label>
+          <label className="flex items-center gap-2 text-sm sm:col-span-2">
+            <input type="checkbox" checked={couponActive} onChange={(e) => setCouponActive(e.target.checked)} />
+            Active (users can use it)
+          </label>
+        </div>
+        <div className="mt-3 flex justify-end">
+          <Button size="sm" disabled={saving || !couponCodeInput.trim()} onClick={() => void handleSaveCoupon()}>
+            {saving ? "Saving…" : "Save coupon"}
+          </Button>
+        </div>
+
+        <h4 className="mt-6 text-sm font-semibold text-gray-800 dark:text-white">Existing coupons</h4>
+        <ul className="mt-2 space-y-2">
+          {coupons.length === 0 ? <li className="text-sm text-gray-500">No coupons yet.</li> : null}
+          {coupons.map((c) => (
+            <li
+              key={c.code}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-100 px-3 py-2 text-sm dark:border-gray-800"
+            >
+              <div>
+                <p className="font-semibold">{c.code}</p>
+                <p className="text-xs text-gray-500">
+                  Final ₹ — Basic {Math.round((c.amountPaiseByPackage.basic ?? 0) / 100) || "—"} · Pro{" "}
+                  {Math.round((c.amountPaiseByPackage.pro ?? 0) / 100) || "—"} · Premium{" "}
+                  {Math.round((c.amountPaiseByPackage.premium ?? 0) / 100) || "—"}
+                  {" · "}used {c.usedCount}
+                  {c.maxUses != null ? `/${c.maxUses}` : ""}
+                  {!c.active ? " · inactive" : ""}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button type="button" className="text-brand-500 hover:underline" onClick={() => handleEditCoupon(c)}>
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  className="text-red-500 hover:underline"
+                  onClick={() => void handleDeleteCoupon(c.code)}
+                >
+                  Delete
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </AdminDialog>
 
       {/* Registration detail */}
-      {selectedView ? (
-        <div className="fixed inset-0 z-999999 flex items-center justify-center bg-gray-900/45 backdrop-blur-md p-4">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 dark:bg-gray-900">
-            <h3 className="text-lg font-bold">{selectedView.name}</h3>
-            <dl className="mt-3 space-y-2 text-sm">
-              <div><dt className="text-gray-500">Email</dt><dd>{selectedView.email}</dd></div>
-              <div><dt className="text-gray-500">Phone</dt><dd>{selectedView.phone}</dd></div>
-              <div><dt className="text-gray-500">City</dt><dd>{selectedView.city}</dd></div>
-              <div>
-                <dt className="text-gray-500">Coupon / Referral code</dt>
-                <dd className="font-mono font-semibold text-emerald-700 dark:text-emerald-300">
-                  {selectedView.couponCode?.trim() ? selectedView.couponCode : "— (none used)"}
-                </dd>
-              </div>
-              <div><dt className="text-gray-500">Event key</dt><dd className="font-mono text-xs">{selectedView.eventKey || "—"}</dd></div>
-              <div>
-                <dt className="text-gray-500">Package</dt>
-                <dd className="capitalize">
-                  {selectedView.packageId}
-                  {selectedView.packageAmountPaise != null
-                    ? ` · paid ₹${Math.round(selectedView.packageAmountPaise / 100)}`
-                    : ""}
-                  {selectedView.packageOriginalAmountPaise != null &&
-                  selectedView.packageOriginalAmountPaise !== selectedView.packageAmountPaise
-                    ? ` (was ₹${Math.round(selectedView.packageOriginalAmountPaise / 100)})`
-                    : ""}
-                </dd>
-              </div>
-              <div><dt className="text-gray-500">Paid</dt><dd>{selectedView.razorpayPaymentId || "No"}</dd></div>
-            </dl>
-            <div className="mt-5 flex justify-end">
-              <Button size="sm" variant="outline" onClick={() => setViewId(null)}>
-                Close
-              </Button>
+      <AdminDialog
+        open={!!selectedView}
+        onClose={() => setViewId(null)}
+        title={selectedView?.name || "Registration"}
+        footer={
+          <Button size="sm" variant="outline" onClick={() => setViewId(null)}>
+            Close
+          </Button>
+        }
+      >
+        {selectedView ? (
+          <dl className="space-y-2 text-sm">
+            <div>
+              <dt className="text-gray-500">Email</dt>
+              <dd>{selectedView.email}</dd>
             </div>
-          </div>
-        </div>
-      ) : null}
+            <div>
+              <dt className="text-gray-500">Phone</dt>
+              <dd>{selectedView.phone}</dd>
+            </div>
+            <div>
+              <dt className="text-gray-500">City</dt>
+              <dd>{selectedView.city}</dd>
+            </div>
+            <div>
+              <dt className="text-gray-500">Coupon / Referral code</dt>
+              <dd className="font-mono font-semibold text-emerald-700 dark:text-emerald-300">
+                {selectedView.couponCode?.trim() ? selectedView.couponCode : "— (none used)"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-gray-500">Event key</dt>
+              <dd className="font-mono text-xs">{selectedView.eventKey || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-gray-500">Package</dt>
+              <dd className="capitalize">
+                {selectedView.packageId}
+                {selectedView.packageAmountPaise != null
+                  ? ` · paid ₹${Math.round(selectedView.packageAmountPaise / 100)}`
+                  : ""}
+                {selectedView.packageOriginalAmountPaise != null &&
+                selectedView.packageOriginalAmountPaise !== selectedView.packageAmountPaise
+                  ? ` (was ₹${Math.round(selectedView.packageOriginalAmountPaise / 100)})`
+                  : ""}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-gray-500">Paid</dt>
+              <dd>{selectedView.razorpayPaymentId || "No"}</dd>
+            </div>
+          </dl>
+        ) : null}
+      </AdminDialog>
 
-      {confirmDelete ? (
-        <div className="fixed inset-0 z-999999 flex items-center justify-center bg-gray-900/45 backdrop-blur-md p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 dark:bg-gray-900">
-            <p className="text-sm text-gray-700 dark:text-gray-200">
+      <AdminDialog
+        open={!!confirmDelete}
+        onClose={() => setConfirmDelete(null)}
+        title="Delete registration?"
+        description={
+          confirmDelete ? (
+            <>
               Delete registration for <strong>{confirmDelete.email}</strong>?
-            </p>
-            <div className="mt-4 flex justify-end gap-2">
-              <Button size="sm" variant="outline" onClick={() => setConfirmDelete(null)}>
-                Cancel
-              </Button>
-              <Button size="sm" disabled={!!deletingId} onClick={() => void handleDelete(confirmDelete.id)}>
-                Delete
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+            </>
+          ) : undefined
+        }
+        maxWidthClass="max-w-sm"
+        footer={
+          <>
+            <Button size="sm" variant="outline" onClick={() => setConfirmDelete(null)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              disabled={!!deletingId || !confirmDelete}
+              onClick={() => confirmDelete && void handleDelete(confirmDelete.id)}
+            >
+              Delete
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-gray-600 dark:text-gray-300">This cannot be undone.</p>
+      </AdminDialog>
+
     </>
   );
 }

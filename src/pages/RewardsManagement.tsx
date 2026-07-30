@@ -9,6 +9,7 @@ import {
 import Button from "../components/ui/button/Button";
 import Input from "../components/form/input/InputField";
 import Label from "../components/form/Label";
+import { AdminDialog } from "../components/ui/modal/AdminDialog";
 
 export default function RewardsManagement() {
   const [rows, setRows] = useState<UserRewardRow[]>([]);
@@ -152,45 +153,51 @@ export default function RewardsManagement() {
         </div>
       </div>
 
-      {/* GRANT POINTS MODAL */}
-      {grantingUser && (
-        <div className="fixed inset-0 z-999999 flex items-center justify-center bg-gray-900/45 backdrop-blur-md p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-md w-full p-6 space-y-6 shadow-xl border border-gray-200 dark:border-gray-800">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-              Grant Bonus Points to {grantingUser.user.fullName || grantingUser.user.email}
-            </h3>
-            <form onSubmit={handleGrantSubmit} className="space-y-4">
-              <div>
-                <Label>Points Amount (positive to add, negative to deduct)</Label>
-                <Input
-                  type="number"
-                  value={pointsInput}
-                  onChange={(e) => setPointsInput(e.target.value)}
-                  placeholder="e.g. 50"
-                />
-              </div>
-
-              <div>
-                <Label>Reason / Description</Label>
-                <Input
-                  value={descInput}
-                  onChange={(e) => setDescInput(e.target.value)}
-                  placeholder="e.g. Community contribution reward"
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-800">
-                <Button type="button" variant="outline" onClick={() => setGrantingUser(null)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={submitting} className="bg-amber-500 hover:bg-amber-600 text-white">
-                  {submitting ? "Granting..." : "Grant Points"}
-                </Button>
-              </div>
-            </form>
+      <AdminDialog
+        open={!!grantingUser}
+        onClose={() => setGrantingUser(null)}
+        title={`Grant bonus points`}
+        description={
+          grantingUser
+            ? `To ${grantingUser.user.fullName || grantingUser.user.email}`
+            : undefined
+        }
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={() => setGrantingUser(null)}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="grant-points-form"
+              disabled={submitting}
+              className="bg-amber-500 hover:bg-amber-600 text-white"
+            >
+              {submitting ? "Granting..." : "Grant Points"}
+            </Button>
+          </>
+        }
+      >
+        <form id="grant-points-form" onSubmit={handleGrantSubmit} className="space-y-4">
+          <div>
+            <Label>Points Amount (positive to add, negative to deduct)</Label>
+            <Input
+              type="number"
+              value={pointsInput}
+              onChange={(e) => setPointsInput(e.target.value)}
+              placeholder="e.g. 50"
+            />
           </div>
-        </div>
-      )}
+          <div>
+            <Label>Reason / Description</Label>
+            <Input
+              value={descInput}
+              onChange={(e) => setDescInput(e.target.value)}
+              placeholder="e.g. Community contribution reward"
+            />
+          </div>
+        </form>
+      </AdminDialog>
     </>
   );
 }

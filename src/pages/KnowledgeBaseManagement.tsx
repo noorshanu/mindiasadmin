@@ -13,6 +13,7 @@ import Button from "../components/ui/button/Button";
 import Input from "../components/form/input/InputField";
 import Label from "../components/form/Label";
 import TextArea from "../components/form/input/TextArea";
+import { AdminDialog } from "../components/ui/modal/AdminDialog";
 
 const CATEGORIES = [
   { key: "all", label: "All Categories" },
@@ -254,54 +255,57 @@ export default function KnowledgeBaseManagement() {
         </div>
       </div>
 
-      {/* ADD KNOWLEDGE ITEM MODAL */}
-      {isAddOpen && (
-        <div className="fixed inset-0 z-999999 flex items-center justify-center bg-gray-900/45 backdrop-blur-md p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-lg w-full p-6 space-y-6 shadow-xl border border-gray-200 dark:border-gray-800">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Add RAG Knowledge Snippet</h3>
-            <form onSubmit={handleCreate} className="space-y-4">
-              <div>
-                <Label>Title / Topic</Label>
-                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Managing Social Anxiety" />
-              </div>
-
-              <div>
-                <Label>Category</Label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white"
-                >
-                  {CATEGORIES.filter((c) => c.key !== "all").map((c) => (
-                    <option key={c.key} value={c.key}>
-                      {c.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <Label>Content Snippet (Psychological Guidance / Facts)</Label>
-                <TextArea
-                  value={content}
-                  onChange={setContent}
-                  rows={6}
-                  placeholder="Enter detailed facts, CBT exercises, or advice..."
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-800">
-                <Button type="button" variant="outline" onClick={() => setIsAddOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={submitting} className="bg-brand-500 hover:bg-brand-600 text-white">
-                  {submitting ? "Indexing..." : "Index Knowledge Snippet"}
-                </Button>
-              </div>
-            </form>
+      <AdminDialog
+        open={isAddOpen}
+        onClose={() => setIsAddOpen(false)}
+        title="Add RAG knowledge snippet"
+        description="Index psychological guidance the AI can retrieve."
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={() => setIsAddOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="add-knowledge-form"
+              disabled={submitting}
+              className="bg-brand-500 hover:bg-brand-600 text-white"
+            >
+              {submitting ? "Indexing..." : "Index Knowledge Snippet"}
+            </Button>
+          </>
+        }
+      >
+        <form id="add-knowledge-form" onSubmit={handleCreate} className="space-y-4">
+          <div>
+            <Label>Title / Topic</Label>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Managing Social Anxiety" />
           </div>
-        </div>
-      )}
+          <div>
+            <Label>Category</Label>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            >
+              {CATEGORIES.filter((c) => c.key !== "all").map((c) => (
+                <option key={c.key} value={c.key}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <Label>Content Snippet (Psychological Guidance / Facts)</Label>
+            <TextArea
+              value={content}
+              onChange={setContent}
+              rows={6}
+              placeholder="Enter detailed facts, CBT exercises, or advice..."
+            />
+          </div>
+        </form>
+      </AdminDialog>
     </>
   );
 }
