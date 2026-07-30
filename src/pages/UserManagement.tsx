@@ -24,6 +24,7 @@ export default function UserManagement() {
   const [error, setError] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [softDeletingId, setSoftDeletingId] = useState<string | null>(null);
   const [editRoleId, setEditRoleId] = useState<string | null>(null);
   const [editRole, setEditRole] = useState<"user" | "admin">("user");
   const [roleFilter, setRoleFilter] = useState<"all" | "user" | "admin">("all");
@@ -88,7 +89,7 @@ export default function UserManagement() {
   };
 
   const handleDelete = async (id: string, email?: string) => {
-    if (!window.confirm(`Delete user ${email || id}? This cannot be undone.`)) return;
+    if (!window.confirm(`Delete user ${email || id}? This will permanently wipe all their data and cannot be undone.`)) return;
     setDeletingId(id);
     try {
       await deleteUser(id);
@@ -98,6 +99,22 @@ export default function UserManagement() {
       setError(e instanceof Error ? e.message : "Delete failed");
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleSoftDelete = async (id: string, currentIsActive: boolean, email?: string) => {
+    const action = currentIsActive ? "Deactivate" : "Activate";
+    if (!window.confirm(`${action} user ${email || id}?`)) return;
+    setSoftDeletingId(id);
+    try {
+      const res = await updateUser(id, { isActive: !currentIsActive });
+      setUsers((prev) =>
+        prev.map((u) => (u._id === id ? { ...u, isActive: res.data.isActive } : u))
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : `${action} failed`);
+    } finally {
+      setSoftDeletingId(null);
     }
   };
 
@@ -252,7 +269,15 @@ export default function UserManagement() {
                           ? new Date(user.createdAt).toLocaleDateString()
                           : "—"}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 space-x-3">
+                        <button
+                          type="button"
+                          onClick={() => handleSoftDelete(user._id, user.isActive !== false, user.email)}
+                          disabled={softDeletingId === user._id}
+                          className="text-amber-600 hover:text-amber-700 text-sm disabled:opacity-50 dark:text-amber-500 dark:hover:text-amber-400"
+                        >
+                          {softDeletingId === user._id ? "Processing..." : (user.isActive !== false ? "Deactivate" : "Activate")}
+                        </button>
                         <button
                           type="button"
                           onClick={() => handleDelete(user._id, user.email)}
