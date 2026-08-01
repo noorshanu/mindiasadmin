@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import PageMeta from "../components/common/PageMeta";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import {
@@ -9,6 +9,7 @@ import {
   updateTeamMember,
   uploadTeamMemberImage,
   deleteTeamMember,
+  reorderTeam,
   fetchSocial,
   updateSocial,
   uploadHomeHeroSlide,
@@ -21,6 +22,8 @@ import Button from "../components/ui/button/Button";
 import TextArea from "../components/form/input/TextArea";
 import Label from "../components/form/Label";
 import Input from "../components/form/input/InputField";
+import { DndProvider, useDrag, useDrop } from "react-dnd";
+import { HTML5Backend } from "react-dnd-html5-backend";
 
 const DEFAULT_VISION =
   "A world where no one has to pretend they're okay. Where silence doesn't mean strength, and asking for help isn't a last option—it's a normal one. We imagine a future where technology doesn't replace human warmth, but holds space until humans can reach each other. Mind's AI dreams of being that quiet presence—the one that listens when the world doesn't, the one that stays when everything feels heavy, the one that reminds you: you're not broken, you're becoming.";
@@ -30,6 +33,172 @@ const DEFAULT_MISSION =
 
 const DEFAULT_THOUGHT =
   "Small steps still move you forward. Be gentle with yourself today.";
+
+const TEAM_CARD_TYPE = "TEAM_CARD";
+
+interface DraggableTeamCardProps {
+  member: TeamMember;
+  index: number;
+  moveCard: (dragIndex: number, hoverIndex: number) => void;
+  editingId: string | null;
+  editName: string;
+  editTitle: string;
+  setEditName: (v: string) => void;
+  setEditTitle: (v: string) => void;
+  setEditingId: (v: string | null) => void;
+  uploadingId: string | null;
+  handleUploadImage: (id: string, file: File) => void;
+  handleDeleteMember: (id: string) => void;
+  handleUpdateMember: (id: string) => void;
+}
+
+function DraggableTeamCard({
+  member: m,
+  index,
+  moveCard,
+  editingId,
+  editName,
+  editTitle,
+  setEditName,
+  setEditTitle,
+  setEditingId,
+  uploadingId,
+  handleUploadImage,
+  handleDeleteMember,
+  handleUpdateMember,
+}: DraggableTeamCardProps) {
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  const [{ isDragging }, drag, preview] = useDrag({
+    type: TEAM_CARD_TYPE,
+    item: { index },
+    collect: (monitor) => ({ isDragging: monitor.isDragging() }),
+  });
+
+  const [{ isOver }, drop] = useDrop({
+    accept: TEAM_CARD_TYPE,
+    hover(item: { index: number }) {
+      if (!cardRef.current) return;
+      const dragIndex = item.index;
+      const hoverIndex = index;
+      if (dragIndex === hoverIndex) return;
+      moveCard(dragIndex, hoverIndex);
+      item.index = hoverIndex;
+    },
+    collect: (monitor) => ({ isOver: monitor.isOver() }),
+  });
+
+  preview(drop(cardRef));
+
+  return (
+    <div
+      ref={cardRef}
+      className={`rounded-xl border p-4 transition-all duration-200 ${
+        isDragging
+          ? "opacity-40 scale-[0.98] border-brand-400 bg-brand-50 dark:bg-brand-950/20"
+          : isOver
+            ? "border-brand-400 bg-brand-50/50 dark:bg-brand-950/10 shadow-md"
+            : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm"
+      }`}
+    >
+      <div className="flex items-center gap-4">
+        {/* Drag Handle */}
+        <div
+          ref={(node) => { drag(node); }}
+          className="shrink-0 cursor-grab active:cursor-grabbing p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition text-gray-400 dark:text-gray-500"
+          title="Drag to reorder"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+          </svg>
+        </div>
+
+        {/* Position Badge */}
+        <div className="shrink-0 w-8 h-8 rounded-full bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 flex items-center justify-center text-xs font-bold">
+          {index + 1}
+        </div>
+
+        {/* Photo */}
+        <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+          {m.imageUrl ? (
+            <img src={m.imageUrl} alt={m.name} className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-lg text-gray-400 font-bold">👤</div>
+          )}
+        </div>
+
+        {/* Name / Title or Edit Form */}
+        <div className="flex-1 min-w-0">
+          {editingId === m._id ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Name"
+                className="max-w-[180px]"
+              />
+              <Input
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                placeholder="Title"
+                className="max-w-[180px]"
+              />
+              <Button size="sm" onClick={() => handleUpdateMember(m._id)} className="bg-brand-500 text-white text-xs">
+                Save
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setEditingId(null)} className="text-xs">
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            <div>
+              <div className="font-bold text-gray-900 dark:text-white text-sm truncate">{m.name}</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{m.title}</div>
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
+        {editingId !== m._id && (
+          <div className="shrink-0 flex items-center gap-2">
+            <button
+              onClick={() => {
+                setEditingId(m._id);
+                setEditName(m.name);
+                setEditTitle(m.title);
+              }}
+              className="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:underline whitespace-nowrap"
+            >
+              Edit
+            </button>
+            <label className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-brand-500/30 bg-brand-50 dark:bg-brand-950/50 px-2.5 py-1.5 text-xs font-semibold text-brand-600 dark:text-brand-400 hover:bg-brand-100 transition whitespace-nowrap">
+              {uploadingId === m._id ? "Uploading..." : "Photo"}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={uploadingId === m._id}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleUploadImage(m._id, f);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            <button
+              onClick={() => {
+                if (window.confirm(`Delete ${m.name}?`)) handleDeleteMember(m._id);
+              }}
+              className="text-xs text-rose-500 hover:underline font-medium whitespace-nowrap"
+            >
+              Delete
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function ContentManagement() {
   const [vision, setVision] = useState(DEFAULT_VISION);
@@ -60,6 +229,9 @@ export default function ContentManagement() {
   const [heroAlt, setHeroAlt] = useState("");
   const [uploadingHero, setUploadingHero] = useState(false);
   const [deletingHeroId, setDeletingHeroId] = useState<string | null>(null);
+  const [orderChanged, setOrderChanged] = useState(false);
+  const [savingOrder, setSavingOrder] = useState(false);
+  const originalOrderRef = useRef<string[]>([]);
 
   const loadContent = useCallback(async () => {
     setLoading(true);
@@ -78,7 +250,10 @@ export default function ContentManagement() {
           : DEFAULT_THOUGHT,
       );
       setHomeHeroSlides(contentRes.homeHeroSlides ?? []);
-      setTeam(teamRes.data || []);
+      const teamData = teamRes.data || [];
+      setTeam(teamData);
+      originalOrderRef.current = teamData.map((m: TeamMember) => m._id);
+      setOrderChanged(false);
       setSocial({
         facebookUrl: socialRes.data.facebookUrl || "",
         twitterUrl: socialRes.data.twitterUrl || "",
@@ -104,13 +279,45 @@ export default function ContentManagement() {
     setError(null);
     try {
       const res = await addTeamMember({ name: newName.trim(), title: newTitle.trim() });
-      setTeam((prev) => [...prev, res.data]);
+      setTeam((prev) => {
+        const next = [...prev, res.data];
+        originalOrderRef.current = next.map((m) => m._id);
+        return next;
+      });
       setNewName("");
       setNewTitle("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to add member");
     } finally {
       setAddingMember(false);
+    }
+  };
+
+  const moveTeamMember = useCallback((dragIndex: number, hoverIndex: number) => {
+    setTeam((prev) => {
+      const next = [...prev];
+      const [removed] = next.splice(dragIndex, 1);
+      next.splice(hoverIndex, 0, removed);
+      return next;
+    });
+    setOrderChanged(true);
+  }, []);
+
+  const handleSaveOrder = async () => {
+    setSavingOrder(true);
+    setError(null);
+    try {
+      const orderedIds = team.map((m) => m._id);
+      const res = await reorderTeam(orderedIds);
+      setTeam(res.data);
+      originalOrderRef.current = res.data.map((m: TeamMember) => m._id);
+      setOrderChanged(false);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to save order");
+    } finally {
+      setSavingOrder(false);
     }
   };
 
@@ -463,136 +670,96 @@ export default function ContentManagement() {
 
             {/* TAB 3: Our Team Members */}
             {activeTab === "team_members" && (
-              <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800 space-y-6">
-                <div>
-                  <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-                    Our Team Members
-                  </h2>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                    Manage key leaders, founders, and team members displayed on public pages.
-                  </p>
-                </div>
-
-                {/* Add new member form */}
-                <div className="flex flex-wrap items-end gap-4 p-4 bg-gray-50 dark:bg-gray-800/40 rounded-xl border border-gray-200 dark:border-gray-700">
-                  <div className="min-w-[200px]">
-                    <Label className="mb-1">Full Name</Label>
-                    <Input
-                      value={newName}
-                      onChange={(e) => setNewName(e.target.value)}
-                      placeholder="e.g. Mr. Sai Prasanth AB"
-                    />
-                  </div>
-                  <div className="min-w-[200px]">
-                    <Label className="mb-1">Title / Role</Label>
-                    <Input
-                      value={newTitle}
-                      onChange={(e) => setNewTitle(e.target.value)}
-                      placeholder="e.g. Founder & CEO"
-                    />
-                  </div>
-                  <Button
-                    onClick={handleAddMember}
-                    disabled={addingMember || !newName.trim() || !newTitle.trim()}
-                    className="bg-brand-500 hover:bg-brand-600 text-white"
-                  >
-                    {addingMember ? "Adding..." : "+ Add Team Member"}
-                  </Button>
-                </div>
-
-                {/* Team Grid */}
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {team.map((m) => (
-                    <div
-                      key={m._id}
-                      className="rounded-xl border border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-900 shadow-sm"
-                    >
-                      <div className="mb-3 flex items-start justify-between gap-3">
-                        <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-                          {m.imageUrl ? (
-                            <img
-                              src={m.imageUrl}
-                              alt={m.name}
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center text-xl text-gray-400 font-bold">
-                              👤
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex flex-col gap-2">
-                          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-brand-500/30 bg-brand-50 dark:bg-brand-950/50 px-3 py-1.5 text-xs font-semibold text-brand-600 dark:text-brand-400 hover:bg-brand-100 transition">
-                            {uploadingId === m._id ? "Uploading..." : "Upload Photo"}
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              disabled={uploadingId === m._id}
-                              onChange={(e) => {
-                                const f = e.target.files?.[0];
-                                if (f) handleUploadImage(m._id, f);
-                                e.target.value = "";
-                              }}
-                            />
-                          </label>
-                          <button
-                            onClick={() => {
-                              if (window.confirm(`Delete ${m.name}?`)) handleDeleteMember(m._id);
-                            }}
-                            className="text-xs text-rose-500 hover:underline font-medium text-left"
-                          >
-                            Delete Member
-                          </button>
-                        </div>
-                      </div>
-
-                      {editingId === m._id ? (
-                        <div className="space-y-2 pt-2">
-                          <Input
-                            value={editName}
-                            onChange={(e) => setEditName(e.target.value)}
-                            placeholder="Name"
-                          />
-                          <Input
-                            value={editTitle}
-                            onChange={(e) => setEditTitle(e.target.value)}
-                            placeholder="Title"
-                          />
-                          <div className="flex gap-2 pt-1">
-                            <Button size="sm" onClick={() => handleUpdateMember(m._id)} className="bg-brand-500 text-white text-xs">
-                              Save
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => setEditingId(null)} className="text-xs">
-                              Cancel
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="pt-2">
-                          <div className="font-bold text-gray-900 dark:text-white text-sm">{m.name}</div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{m.title}</div>
-                          <button
-                            onClick={() => {
-                              setEditingId(m._id);
-                              setEditName(m.name);
-                              setEditTitle(m.title);
-                            }}
-                            className="mt-2 text-xs font-semibold text-brand-600 dark:text-brand-400 underline"
-                          >
-                            Edit Name / Title
-                          </button>
-                        </div>
-                      )}
+              <DndProvider backend={HTML5Backend}>
+                <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800 space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                        Our Team Members
+                      </h2>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        Drag and drop to reorder team members. The order here is how they appear on the public website.
+                      </p>
                     </div>
-                  ))}
+                    {orderChanged && (
+                      <Button
+                        onClick={handleSaveOrder}
+                        disabled={savingOrder}
+                        className="bg-emerald-500 hover:bg-emerald-600 text-white shrink-0 flex items-center gap-2"
+                      >
+                        <span className="relative flex h-2.5 w-2.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white" />
+                        </span>
+                        {savingOrder ? "Saving..." : "Save New Order"}
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Add new member form */}
+                  <div className="flex flex-wrap items-end gap-4 p-4 bg-gray-50 dark:bg-gray-800/40 rounded-xl border border-gray-200 dark:border-gray-700">
+                    <div className="min-w-[200px]">
+                      <Label className="mb-1">Full Name</Label>
+                      <Input
+                        value={newName}
+                        onChange={(e) => setNewName(e.target.value)}
+                        placeholder="e.g. Mr. Sai Prasanth AB"
+                      />
+                    </div>
+                    <div className="min-w-[200px]">
+                      <Label className="mb-1">Title / Role</Label>
+                      <Input
+                        value={newTitle}
+                        onChange={(e) => setNewTitle(e.target.value)}
+                        placeholder="e.g. Founder & CEO"
+                      />
+                    </div>
+                    <Button
+                      onClick={handleAddMember}
+                      disabled={addingMember || !newName.trim() || !newTitle.trim()}
+                      className="bg-brand-500 hover:bg-brand-600 text-white"
+                    >
+                      {addingMember ? "Adding..." : "+ Add Team Member"}
+                    </Button>
+                  </div>
+
+                  {orderChanged && (
+                    <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 text-xs font-medium">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
+                      You have unsaved order changes. Click "Save New Order" to apply them to the live website.
+                    </div>
+                  )}
+
+                  {/* Team List — Draggable */}
+                  <div className="space-y-3">
+                    {team.map((m, index) => (
+                      <DraggableTeamCard
+                        key={m._id}
+                        member={m}
+                        index={index}
+                        moveCard={moveTeamMember}
+                        editingId={editingId}
+                        editName={editName}
+                        editTitle={editTitle}
+                        setEditName={setEditName}
+                        setEditTitle={setEditTitle}
+                        setEditingId={setEditingId}
+                        uploadingId={uploadingId}
+                        handleUploadImage={handleUploadImage}
+                        handleDeleteMember={handleDeleteMember}
+                        handleUpdateMember={handleUpdateMember}
+                      />
+                    ))}
+                  </div>
+                  {team.length === 0 && (
+                    <p className="py-8 text-center text-sm text-gray-500">
+                      No team members added yet. Add member profile above!
+                    </p>
+                  )}
                 </div>
-                {team.length === 0 && (
-                  <p className="py-8 text-center text-sm text-gray-500">
-                    No team members added yet. Add member profile above!
-                  </p>
-                )}
-              </div>
+              </DndProvider>
             )}
 
             {/* TAB 4: Social & Office Info */}

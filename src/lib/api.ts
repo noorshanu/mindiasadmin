@@ -628,6 +628,18 @@ export async function deleteTeamMember(id: string) {
   return unwrapBackendSuccess(raw);
 }
 
+export async function reorderTeam(orderedIds: string[]) {
+  const res = await fetch(`${API_BASE}/api/admin/team/reorder`, {
+    method: "PUT",
+    headers: getHeaders(true),
+    body: JSON.stringify({ orderedIds }),
+  });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const list = readArrayData(unwrapBackendSuccess(raw)) as TeamMember[];
+  return { success: true as const, data: list };
+}
+
 // ——— Support Messages —————————————————————————————————───────────────────
 
 export type SupportMessage = {
