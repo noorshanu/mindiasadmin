@@ -21,6 +21,7 @@ import Home from "./pages/Dashboard/Home";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import GuestRoute from "./components/auth/GuestRoute";
 import UserManagement from "./pages/UserManagement";
+import RestrictedUsers from "./pages/RestrictedUsers";
 import UserDetail from "./pages/UserDetail";
 import AdminStaffManagement from "./pages/AdminStaffManagement";
 import ContentManagement from "./pages/ContentManagement";
@@ -95,10 +96,10 @@ export default function App() {
               }
             />
             <Route
-              path="/users/:id"
+              path="/users/restricted"
               element={
                 <ProtectedRoute permission="manage_users">
-                  <UserDetail />
+                  <RestrictedUsers />
                 </ProtectedRoute>
               }
             />
@@ -107,6 +108,14 @@ export default function App() {
               element={
                 <ProtectedRoute permission="manage_users">
                   <RewardsManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/users/:id"
+              element={
+                <ProtectedRoute permission="manage_users">
+                  <UserDetail />
                 </ProtectedRoute>
               }
             />

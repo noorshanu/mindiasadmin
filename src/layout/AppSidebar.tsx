@@ -6,6 +6,7 @@ import {
   BrainCircuit,
   Users,
   Award,
+  ShieldAlert,
   UserCog,
   FileText,
   Video,
@@ -73,6 +74,12 @@ const navGroups: NavGroup[] = [
         icon: <Users className="size-5" />,
         name: "App Users",
         path: "/users",
+        permission: "manage_users",
+      },
+      {
+        icon: <ShieldAlert className="size-5" />,
+        name: "Restricted Users",
+        path: "/users/restricted",
         permission: "manage_users",
       },
       {

@@ -10,6 +10,7 @@ import {
   fetchUserJournalEntries,
   fetchUserActivityHistory,
   updateUser,
+  unrestrictUserChat,
   type AdminUser,
   type AdminChatSession,
   type SupportMessage,
@@ -29,6 +30,7 @@ export default function UserDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [togglingActive, setTogglingActive] = useState(false);
+  const [unrestricting, setUnrestricting] = useState(false);
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
   const [editEmail, setEditEmail] = useState("");
@@ -67,6 +69,21 @@ export default function UserDetail() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const handleUnrestrictChat = async () => {
+    if (!user || unrestricting) return;
+    if (!window.confirm(`Unrestrict chat for ${user.email || user.username || user._id}?`)) return;
+    setUnrestricting(true);
+    setError(null);
+    try {
+      const res = await unrestrictUserChat(user._id);
+      setUser({ ...user, ...res.data, chatRestricted: false });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to unrestrict chat");
+    } finally {
+      setUnrestricting(false);
+    }
+  };
 
   const handleToggleActive = async () => {
     if (!user || togglingActive) return;
@@ -146,6 +163,7 @@ export default function UserDetail() {
   }
 
   const isActive = user.isActive !== false;
+  const chatRestricted = !!user.chatRestricted;
 
   return (
     <>
@@ -158,6 +176,18 @@ export default function UserDetail() {
           </div>
         )}
 
+        {chatRestricted ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
+            <p className="font-medium">This user is restricted from chat.</p>
+            <p className="mt-1">
+              {user.chatRestrictedReason || "Safety policy"}
+              {user.chatRestrictedAt
+                ? ` · ${new Date(user.chatRestrictedAt).toLocaleString()}`
+                : ""}
+            </p>
+          </div>
+        ) : null}
+
         {/* Full user info + editable fields */}
         <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] lg:p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
@@ -165,7 +195,18 @@ export default function UserDetail() {
             <div className="flex items-center gap-3">
               <span className="text-sm text-gray-600 dark:text-gray-400">
                 Account: {isActive ? "Active" : "Inactive"}
+                {chatRestricted ? " · Chat restricted" : ""}
               </span>
+              {chatRestricted ? (
+                <button
+                  type="button"
+                  onClick={handleUnrestrictChat}
+                  disabled={unrestricting}
+                  className="rounded-lg bg-green-100 px-3 py-1.5 text-sm font-medium text-green-800 hover:bg-green-200 disabled:opacity-50 dark:bg-green-900/30 dark:text-green-300"
+                >
+                  {unrestricting ? "Unrestricting..." : "Unrestrict chat"}
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={handleToggleActive}
@@ -296,6 +337,40 @@ export default function UserDetail() {
               <dt className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Joined</dt>
               <dd className="mt-0.5 text-gray-800 dark:text-white/90">
                 {user.createdAt ? new Date(user.createdAt).toLocaleString() : "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Chat access</dt>
+              <dd className="mt-0.5">
+                {chatRestricted ? (
+                  <span className="inline-flex rounded bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                    Restricted
+                  </span>
+                ) : (
+                  <span className="inline-flex rounded bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                    Allowed
+                  </span>
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Restriction reason</dt>
+              <dd className="mt-0.5 text-gray-800 dark:text-white/90">
+                {user.chatRestrictedReason || "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Restricted at</dt>
+              <dd className="mt-0.5 text-gray-800 dark:text-white/90">
+                {user.chatRestrictedAt
+                  ? new Date(user.chatRestrictedAt).toLocaleString()
+                  : "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Safety flags</dt>
+              <dd className="mt-0.5 text-gray-800 dark:text-white/90">
+                {user.moderationFlagCount ?? 0}
               </dd>
             </div>
           </dl>

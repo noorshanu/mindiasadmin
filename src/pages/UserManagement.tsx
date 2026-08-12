@@ -5,6 +5,7 @@ import {
   fetchUsers,
   updateUser,
   deleteUser,
+  unrestrictUserChat,
   type AdminUser,
 } from "../lib/api";
 import Button from "../components/ui/button/Button";
@@ -29,6 +30,8 @@ export default function UserManagement() {
   const [editRole, setEditRole] = useState<"user" | "admin">("user");
   const [roleFilter, setRoleFilter] = useState<"all" | "user" | "admin">("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+  const [chatFilter, setChatFilter] = useState<"all" | "restricted" | "ok">("all");
+  const [unrestrictingId, setUnrestrictingId] = useState<string | null>(null);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -38,6 +41,7 @@ export default function UserManagement() {
         page: pagination.page,
         limit: pagination.limit,
         search: search || undefined,
+        chatRestricted: chatFilter === "restricted" ? true : chatFilter === "ok" ? false : undefined,
       });
       setUsers(res.data);
       setPagination((prev) => ({
@@ -50,7 +54,7 @@ export default function UserManagement() {
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.limit, search]);
+  }, [pagination.page, pagination.limit, search, chatFilter]);
 
   useEffect(() => {
     loadUsers();
@@ -68,9 +72,11 @@ export default function UserManagement() {
       const isActive = u.isActive !== false;
       if (statusFilter === "active" && !isActive) return false;
       if (statusFilter === "inactive" && isActive) return false;
+      if (chatFilter === "restricted" && !u.chatRestricted) return false;
+      if (chatFilter === "ok" && u.chatRestricted) return false;
       return true;
     });
-  }, [users, roleFilter, statusFilter]);
+  }, [users, roleFilter, statusFilter, chatFilter]);
 
   const handleUpdateRole = async (id: string) => {
     if (!editRoleId || editRoleId !== id) return;
@@ -115,6 +121,21 @@ export default function UserManagement() {
       setError(e instanceof Error ? e.message : `${action} failed`);
     } finally {
       setSoftDeletingId(null);
+    }
+  };
+
+  const handleUnrestrict = async (id: string, email?: string) => {
+    if (!window.confirm(`Unrestrict chat for ${email || id}?`)) return;
+    setUnrestrictingId(id);
+    try {
+      const res = await unrestrictUserChat(id);
+      setUsers((prev) =>
+        prev.map((u) => (u._id === id ? { ...u, ...res.data, chatRestricted: false } : u)),
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unrestrict failed");
+    } finally {
+      setUnrestrictingId(null);
     }
   };
 
@@ -163,6 +184,24 @@ export default function UserManagement() {
                 <option value="active">Active only</option>
                 <option value="inactive">Inactive only</option>
               </select>
+              <select
+                value={chatFilter}
+                onChange={(e) => {
+                  setChatFilter(e.target.value as "all" | "restricted" | "ok");
+                  setPagination((prev) => ({ ...prev, page: 1 }));
+                }}
+                className="h-9 rounded border border-gray-300 bg-white px-2 text-sm text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+              >
+                <option value="all">All chat</option>
+                <option value="restricted">Chat restricted</option>
+                <option value="ok">Chat allowed</option>
+              </select>
+              <Link
+                to="/users/restricted"
+                className="inline-flex h-9 items-center rounded border border-red-200 bg-red-50 px-3 text-sm font-medium text-red-700 hover:bg-red-100 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300"
+              >
+                Restricted users
+              </Link>
             </div>
           </div>
         </div>
@@ -191,6 +230,7 @@ export default function UserManagement() {
                     <th className="px-4 py-3">Username</th>
                     <th className="px-4 py-3">Phone</th>
                     <th className="px-4 py-3">Role</th>
+                    <th className="px-4 py-3">Chat</th>
                     <th className="px-4 py-3">Created</th>
                     <th className="px-4 py-3">Actions</th>
                   </tr>
@@ -265,11 +305,32 @@ export default function UserManagement() {
                         )}
                       </td>
                       <td className="px-4 py-3">
+                        {user.chatRestricted ? (
+                          <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                            Restricted
+                          </span>
+                        ) : (
+                          <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                            Allowed
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
                         {user.createdAt
                           ? new Date(user.createdAt).toLocaleDateString()
                           : "—"}
                       </td>
                       <td className="px-4 py-3 space-x-3">
+                        {user.chatRestricted ? (
+                          <button
+                            type="button"
+                            onClick={() => handleUnrestrict(user._id, user.email)}
+                            disabled={unrestrictingId === user._id}
+                            className="text-green-600 hover:text-green-700 text-sm disabled:opacity-50 dark:text-green-400"
+                          >
+                            {unrestrictingId === user._id ? "Unrestricting..." : "Unrestrict"}
+                          </button>
+                        ) : null}
                         <button
                           type="button"
                           onClick={() => handleSoftDelete(user._id, user.isActive !== false, user.email)}

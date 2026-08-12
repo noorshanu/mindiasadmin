@@ -164,8 +164,39 @@ export type AdminUser = {
   permissions?: string[];
   canAddUsers?: boolean;
   isActive?: boolean;
+  chatRestricted?: boolean;
+  chatRestrictedAt?: string;
+  chatRestrictedReason?: string;
+  moderationFlagCount?: number;
   isEmailVerified?: boolean;
   isPhoneVerified?: boolean;
+  createdAt: string;
+  updatedAt?: string;
+};
+
+export type ModerationEventStatus = "open" | "reviewed" | "dismissed";
+
+export type ModerationEvent = {
+  _id: string;
+  userId:
+    | string
+    | {
+        _id: string;
+        username?: string;
+        email?: string;
+        phone?: string;
+        chatRestricted?: boolean;
+        moderationFlagCount?: number;
+        isActive?: boolean;
+      };
+  sessionId?: string;
+  messageExcerpt: string;
+  category: string;
+  severity: "high" | "critical";
+  matchedSignals?: string[];
+  actionTaken: "flagged" | "chat_restricted";
+  status: ModerationEventStatus;
+  adminNote?: string;
   createdAt: string;
   updatedAt?: string;
 };
@@ -244,11 +275,18 @@ export async function adminMe() {
 
 // ——— User Management —————————————————————————————————───────────────────
 
-export async function fetchUsers(params?: { page?: number; limit?: number; search?: string }) {
+export async function fetchUsers(params?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  chatRestricted?: boolean;
+}) {
   const sp = new URLSearchParams();
   if (params?.page != null) sp.set("page", String(params.page));
   if (params?.limit != null) sp.set("limit", String(params.limit));
   if (params?.search != null && params.search.trim()) sp.set("search", params.search.trim());
+  if (params?.chatRestricted === true) sp.set("chatRestricted", "true");
+  if (params?.chatRestricted === false) sp.set("chatRestricted", "false");
   const qs = sp.toString();
   const url = `${API_BASE}/api/admin/users${qs ? `?${qs}` : ""}`;
   const res = await fetch(url, { headers: getHeaders(true) });
@@ -358,7 +396,14 @@ export async function fetchUserActivityHistory(userId: string, params?: { limit?
 
 export async function updateUser(
   id: string,
-  body: { username?: string; email?: string; role?: "user" | "admin"; isActive?: boolean }
+  body: {
+    username?: string;
+    email?: string;
+    role?: "user" | "admin";
+    isActive?: boolean;
+    chatRestricted?: boolean;
+    chatRestrictedReason?: string;
+  }
 ) {
   const res = await fetch(`${API_BASE}/api/admin/users/${id}`, {
     method: "PATCH",
@@ -381,6 +426,76 @@ export async function deleteUser(id: string) {
   const raw = await res.json();
   throwIfFailed(res, raw);
   return unwrapBackendSuccess(raw);
+}
+
+export async function fetchRestrictedUsers() {
+  const res = await fetch(`${API_BASE}/api/admin/moderation/restricted-users`, {
+    headers: getHeaders(true),
+  });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const users = readArrayData(unwrapBackendSuccess(raw)) as AdminUser[];
+  return { success: true as const, data: users };
+}
+
+export async function fetchModerationEvents(params?: {
+  page?: number;
+  limit?: number;
+  status?: ModerationEventStatus | "";
+}) {
+  const sp = new URLSearchParams();
+  if (params?.page != null) sp.set("page", String(params.page));
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  if (params?.status) sp.set("status", params.status);
+  const qs = sp.toString();
+  const res = await fetch(
+    `${API_BASE}/api/admin/moderation${qs ? `?${qs}` : ""}`,
+    { headers: getHeaders(true) },
+  );
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const { rows, pagination } = readPaginatedRows(unwrapBackendSuccess(raw));
+  return {
+    success: true as const,
+    data: rows as ModerationEvent[],
+    pagination,
+  };
+}
+
+export async function unrestrictUserChat(userId: string, note?: string) {
+  const res = await fetch(
+    `${API_BASE}/api/admin/moderation/users/${userId}/unrestrict`,
+    {
+      method: "PATCH",
+      headers: getHeaders(true),
+      body: JSON.stringify(note ? { note } : {}),
+    },
+  );
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  const user = (flat.data || flat) as AdminUser;
+  if (!user || typeof user !== "object" || !("_id" in user)) {
+    throw new Error("Failed to unrestrict user");
+  }
+  return { success: true as const, data: user };
+}
+
+export async function updateModerationEvent(
+  id: string,
+  body: { status: ModerationEventStatus; adminNote?: string },
+) {
+  const res = await fetch(`${API_BASE}/api/admin/moderation/${id}`, {
+    method: "PATCH",
+    headers: getHeaders(true),
+    body: JSON.stringify(body),
+  });
+  const raw = await res.json();
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  const event = flat.data as ModerationEvent;
+  if (!event) throw new Error("Failed to update moderation event");
+  return { success: true as const, data: event };
 }
 
 // ——— Content (Vision & Mission) —————————————————————————————————────────——
