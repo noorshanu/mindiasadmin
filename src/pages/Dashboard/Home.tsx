@@ -8,7 +8,6 @@ import {
   fetchUsers,
   fetchWebinarRegistrations,
   fetchSupportMessages,
-  API_BASE,
 } from "../../lib/api";
 
 type Stats = {
@@ -113,14 +112,7 @@ export default function Home() {
 
         {error && (
           <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-600 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
-            <p>{error}</p>
-            {(error.includes("HTML instead of JSON") || error.includes("Failed to fetch")) && (
-              <p className="mt-2 text-xs opacity-90">
-                API base: <code className="font-mono">{API_BASE}</code> — set{" "}
-                <code className="font-mono">VITE_API_BASE_URL</code> before building, and ensure CORS
-                allows this admin origin on the backend.
-              </p>
-            )}
+            {error}
           </div>
         )}
 

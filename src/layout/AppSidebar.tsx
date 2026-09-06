@@ -13,7 +13,6 @@ import {
   LifeBuoy,
   Activity,
   User,
-  Calendar,
   ChevronDown,
   MoreHorizontal,
 } from "lucide-react";
@@ -105,6 +104,7 @@ const navGroups: NavGroup[] = [
         permission: "manage_content",
         subItems: [
           { name: "Vision & App Content", path: "/content", permission: "manage_content" },
+          { name: "Our Team", path: "/content?tab=team", permission: "manage_content" },
           { name: "Store & Products", path: "/store-management", permission: "manage_content" },
           { name: "Push Notifications", path: "/push-notifications", permission: "manage_content" },
           { name: "FAQ Management", path: "/faq", permission: "manage_content" },
@@ -141,17 +141,12 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    groupLabel: "System & Profile",
+    groupLabel: "Account",
     items: [
       {
         icon: <User className="size-5" />,
-        name: "User Profile",
+        name: "My Profile",
         path: "/profile",
-      },
-      {
-        icon: <Calendar className="size-5" />,
-        name: "Calendar",
-        path: "/calendar",
       },
     ],
   },
@@ -167,9 +162,15 @@ export default function AppSidebar() {
   const subMenuRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const isActive = useCallback(
-    (path?: string) => (path ? location.pathname === path : false),
-    [location.pathname]
-  );
+    (path?: string) => {
+      if (!path) return false
+      const [pathname, search] = path.split("?")
+      if (location.pathname !== pathname) return false
+      if (!search) return !location.search
+      return location.search.includes(search.replace("?", ""))
+    },
+    [location.pathname, location.search],
+  )
 
   // Helper function to check if current logged in user has permission for nav item
   const checkPermission = useCallback(

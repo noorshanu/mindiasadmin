@@ -6,7 +6,7 @@ import Input from "../form/input/InputField";
 import Checkbox from "../form/input/Checkbox";
 import Button from "../ui/button/Button";
 import { useAuth } from "../../context/AuthContext";
-import { adminLogin, ADMIN_SIGNUP_ENABLED, API_BASE } from "../../lib/api";
+import { adminLogin, ADMIN_SIGNUP_ENABLED } from "../../lib/api";
 
 export default function SignInForm() {
   const [showPassword, setShowPassword] = useState(false);
@@ -31,12 +31,7 @@ export default function SignInForm() {
       login(token, user);
       navigate("/", { replace: true });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Sign in failed."
-      if (msg.includes("HTML instead of JSON") || msg.includes("Failed to fetch")) {
-        setError(`${msg} API: ${API_BASE}`)
-      } else {
-        setError(msg)
-      }
+      setError(err instanceof Error ? err.message : "Sign in failed.")
     } finally {
       setLoading(false);
     }

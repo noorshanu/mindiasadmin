@@ -6,7 +6,7 @@ export type AdminDialogProps = {
   onClose: () => void;
   title: ReactNode;
   description?: ReactNode;
-  children: ReactNode;
+  children?: ReactNode;
   /** Sticky bottom actions (Cancel / Save). */
   footer?: ReactNode;
   /** Tailwind max-width class. Default: max-w-lg */
@@ -89,7 +89,7 @@ export function AdminDialog({
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
-          {children}
+          {children ?? null}
         </div>
 
         {footer ? (

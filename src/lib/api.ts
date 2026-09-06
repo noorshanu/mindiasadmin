@@ -1,3 +1,4 @@
+/** Live API by default. Override only if you need a different backend. */
 export const API_BASE = (import.meta.env.VITE_API_BASE_URL || "https://api.mindsai.live")
   .replace(/\/api\/?$/, "")
   .replace(/\/$/, "");
@@ -5,12 +6,6 @@ export const API_BASE = (import.meta.env.VITE_API_BASE_URL || "https://api.minds
 export const ADMIN_SIGNUP_ENABLED = import.meta.env.VITE_ENABLE_ADMIN_SIGNUP === "true";
 
 const ADMIN_SIGNUP_SECRET = (import.meta.env.VITE_ADMIN_SIGNUP_SECRET || "").trim();
-
-if (import.meta.env.PROD && API_BASE.includes("localhost")) {
-  console.warn(
-    "[Admin] VITE_API_BASE_URL is not set — production build will call localhost. Set it before `npm run build`.",
-  );
-}
 
 let onUnauthorized: (() => void) | null = null;
 
