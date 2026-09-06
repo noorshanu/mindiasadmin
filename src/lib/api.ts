@@ -1,7 +1,23 @@
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || "https://api.mindsai.live")
+export const API_BASE = (import.meta.env.VITE_API_BASE_URL || "https://api.mindsai.live")
   .replace(/\/api\/?$/, "")
   .replace(/\/$/, "");
-// Local dev: VITE_API_BASE_URL=http://localhost:4000
+
+export const ADMIN_SIGNUP_ENABLED = import.meta.env.VITE_ENABLE_ADMIN_SIGNUP === "true";
+
+const ADMIN_SIGNUP_SECRET = (import.meta.env.VITE_ADMIN_SIGNUP_SECRET || "").trim();
+
+if (import.meta.env.PROD && API_BASE.includes("localhost")) {
+  console.warn(
+    "[Admin] VITE_API_BASE_URL is not set — production build will call localhost. Set it before `npm run build`.",
+  );
+}
+
+let onUnauthorized: (() => void) | null = null;
+
+/** Register a handler for expired/invalid admin sessions (401 on authenticated routes). */
+export function setOnUnauthorized(handler: (() => void) | null) {
+  onUnauthorized = handler;
+}
 
 async function readApiResponse(res: Response): Promise<unknown> {
   const text = await res.text();
@@ -105,6 +121,22 @@ function throwIfFailed(res: Response, raw: unknown): void {
   throw new Error(o.message || o.error || `Request failed (${res.status})`);
 }
 
+async function parseJsonResponse(res: Response): Promise<unknown> {
+  const raw = await readApiResponse(res);
+  if (res.status === 401 && getToken() && onUnauthorized) {
+    try {
+      const path = new URL(res.url).pathname;
+      if (!path.endsWith("/login") && !path.endsWith("/signup")) {
+        onUnauthorized();
+      }
+    } catch {
+      onUnauthorized();
+    }
+  }
+  throwIfFailed(res, raw);
+  return raw;
+}
+
 type PaginationMeta = {
   page: number;
   limit: number;
@@ -160,7 +192,7 @@ export type AdminUser = {
   dateOfBirth?: string;
   persona?: string;
   role: "user" | "admin";
-  adminRole?: "super_admin" | "admin" | "content_manager" | "user_manager" | "webinar_manager" | "custom";
+  adminRole?: "super_admin" | "admin" | "content_manager" | "user_manager" | "webinar_manager" | "support_manager" | "custom";
   permissions?: string[];
   canAddUsers?: boolean;
   isActive?: boolean;
@@ -219,7 +251,7 @@ export async function adminLogin(email: string, password: string) {
     headers: getHeaders(false),
     body: JSON.stringify({ email, password }),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   if (!res.ok) {
     const err = raw as { message?: string; error?: string };
     throw new Error(err.message || err.error || "Login failed");
@@ -235,13 +267,17 @@ export async function adminLogin(email: string, password: string) {
   };
 }
 
-export async function adminSignup(email: string, password: string, name?: string) {
+export async function adminSignup(email: string, password: string, name?: string, signupSecret?: string) {
+  const headers = getHeaders(false) as Record<string, string>;
+  const secret = (signupSecret || ADMIN_SIGNUP_SECRET).trim();
+  if (secret) headers["x-admin-signup-secret"] = secret;
+
   const res = await fetch(`${API_BASE}/api/admin/auth/signup`, {
     method: "POST",
-    headers: getHeaders(false),
+    headers,
     body: JSON.stringify({ email, password, name }),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   if (!res.ok) {
     const err = raw as { message?: string; error?: string };
     throw new Error(err.message || err.error || "Signup failed");
@@ -261,7 +297,7 @@ export async function adminMe() {
   const res = await fetch(`${API_BASE}/api/admin/auth/me`, {
     headers: getHeaders(true),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   if (!res.ok) {
     const err = raw as { message?: string; error?: string };
     throw new Error(err.message || err.error || "Not authenticated");
@@ -290,7 +326,7 @@ export async function fetchUsers(params?: {
   const qs = sp.toString();
   const url = `${API_BASE}/api/admin/users${qs ? `?${qs}` : ""}`;
   const res = await fetch(url, { headers: getHeaders(true) });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const { rows, pagination } = readPaginatedRows(unwrapBackendSuccess(raw));
   return {
@@ -302,7 +338,7 @@ export async function fetchUsers(params?: {
 
 export async function fetchUser(id: string) {
   const res = await fetch(`${API_BASE}/api/admin/users/${id}`, { headers: getHeaders(true) });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   const user = flat.data as AdminUser;
@@ -312,7 +348,7 @@ export async function fetchUser(id: string) {
 
 export async function fetchUserSessions(userId: string) {
   const res = await fetch(`${API_BASE}/api/admin/users/${userId}/sessions`, { headers: getHeaders(true) });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const sessions = readArrayData(unwrapBackendSuccess(raw)) as AdminChatSession[];
   return { success: true as const, data: sessions };
@@ -320,7 +356,7 @@ export async function fetchUserSessions(userId: string) {
 
 export async function fetchUserSupport(userId: string) {
   const res = await fetch(`${API_BASE}/api/admin/users/${userId}/support`, { headers: getHeaders(true) });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const messages = readArrayData(unwrapBackendSuccess(raw)) as SupportMessage[];
   return { success: true as const, data: messages };
@@ -341,7 +377,7 @@ export async function fetchUserMoodLogs(userId: string, params?: { limit?: numbe
   const qs = sp.toString();
   const url = `${API_BASE}/api/admin/users/${userId}/mood-logs${qs ? `?${qs}` : ""}`;
   const res = await fetch(url, { headers: getHeaders(true) });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   const rows = Array.isArray(flat.data) ? (flat.data as MoodLogRow[]) : [];
@@ -362,7 +398,7 @@ export async function fetchUserJournalEntries(userId: string, params?: { limit?:
   const qs = sp.toString();
   const url = `${API_BASE}/api/admin/users/${userId}/journal-entries${qs ? `?${qs}` : ""}`;
   const res = await fetch(url, { headers: getHeaders(true) });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   const rows = Array.isArray(flat.data) ? (flat.data as UserJournalEntryRow[]) : [];
@@ -387,7 +423,7 @@ export async function fetchUserActivityHistory(userId: string, params?: { limit?
   const qs = sp.toString();
   const url = `${API_BASE}/api/admin/users/${userId}/activity-history${qs ? `?${qs}` : ""}`;
   const res = await fetch(url, { headers: getHeaders(true) });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   const rows = Array.isArray(flat.data) ? (flat.data as UserActivityHistoryRow[]) : [];
@@ -410,7 +446,7 @@ export async function updateUser(
     headers: getHeaders(true),
     body: JSON.stringify(body),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   const user = flat.data as AdminUser;
@@ -423,7 +459,7 @@ export async function deleteUser(id: string) {
     method: "DELETE",
     headers: getHeaders(true),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   return unwrapBackendSuccess(raw);
 }
@@ -432,7 +468,7 @@ export async function fetchRestrictedUsers() {
   const res = await fetch(`${API_BASE}/api/admin/moderation/restricted-users`, {
     headers: getHeaders(true),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const users = readArrayData(unwrapBackendSuccess(raw)) as AdminUser[];
   return { success: true as const, data: users };
@@ -452,7 +488,7 @@ export async function fetchModerationEvents(params?: {
     `${API_BASE}/api/admin/moderation${qs ? `?${qs}` : ""}`,
     { headers: getHeaders(true) },
   );
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const { rows, pagination } = readPaginatedRows(unwrapBackendSuccess(raw));
   return {
@@ -471,7 +507,7 @@ export async function unrestrictUserChat(userId: string, note?: string) {
       body: JSON.stringify(note ? { note } : {}),
     },
   );
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   const user = (flat.data || flat) as AdminUser;
@@ -490,7 +526,7 @@ export async function updateModerationEvent(
     headers: getHeaders(true),
     body: JSON.stringify(body),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   const event = flat.data as ModerationEvent;
@@ -552,7 +588,7 @@ export async function fetchContent() {
   const res = await fetch(`${API_BASE}/api/admin/content`, {
     headers: getHeaders(true),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   return {
@@ -574,7 +610,7 @@ export async function updateContent(body: {
     headers: getHeaders(true),
     body: JSON.stringify(body),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   return {
@@ -621,7 +657,7 @@ export async function deleteHomeHeroSlide(slideId: string) {
       headers: getHeaders(true),
     },
   );
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   return {
@@ -645,7 +681,7 @@ export async function fetchSocial() {
   const res = await fetch(`${API_BASE}/api/admin/social`, {
     headers: getHeaders(true),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   const data = (flat.data as SocialSettings) ?? {
@@ -665,7 +701,7 @@ export async function updateSocial(body: SocialSettings) {
     headers: getHeaders(true),
     body: JSON.stringify(body),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   const data = (flat.data as SocialSettings) ?? {
@@ -685,7 +721,7 @@ export type TeamMember = { _id: string; name: string; title: string; imageUrl?: 
 
 export async function fetchTeam() {
   const res = await fetch(`${API_BASE}/api/admin/team`, { headers: getHeaders(true) });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const list = readArrayData(unwrapBackendSuccess(raw)) as TeamMember[];
   return { success: true as const, data: list };
@@ -697,7 +733,7 @@ export async function addTeamMember(body: { name: string; title: string; imageUr
     headers: getHeaders(true),
     body: JSON.stringify(body),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   const member = flat.data as TeamMember;
@@ -711,7 +747,7 @@ export async function updateTeamMember(id: string, body: { name?: string; title?
     headers: getHeaders(true),
     body: JSON.stringify(body),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   const member = flat.data as TeamMember;
@@ -738,7 +774,7 @@ export async function deleteTeamMember(id: string) {
     method: "DELETE",
     headers: getHeaders(true),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   return unwrapBackendSuccess(raw);
 }
@@ -749,7 +785,7 @@ export async function reorderTeam(orderedIds: string[]) {
     headers: getHeaders(true),
     body: JSON.stringify({ orderedIds }),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const list = readArrayData(unwrapBackendSuccess(raw)) as TeamMember[];
   return { success: true as const, data: list };
@@ -779,7 +815,7 @@ export async function fetchSupportMessages(params?: {
   const qs = sp.toString();
   const url = `${API_BASE}/api/admin/support${qs ? `?${qs}` : ""}`;
   const res = await fetch(url, { headers: getHeaders(true) });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const { rows, pagination } = readPaginatedRows(unwrapBackendSuccess(raw));
   return {
@@ -795,7 +831,7 @@ export async function updateSupportMessageStatus(id: string, status: "pending" |
     headers: getHeaders(true),
     body: JSON.stringify({ status }),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   const doc = flat.data as SupportMessage;
@@ -852,7 +888,7 @@ export async function fetchWebinarRegistrations(params?: {
   const qs = sp.toString();
   const url = `${API_BASE}/api/admin/webinar${qs ? `?${qs}` : ""}`;
   const res = await fetch(url, { headers: getHeaders(true) });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const { rows, pagination } = readPaginatedRows(unwrapBackendSuccess(raw));
   return {
@@ -867,13 +903,7 @@ export async function deleteWebinarRegistration(id: string) {
     method: "DELETE",
     headers: getHeaders(true),
   });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok)
-    throw new Error(
-      (data as { message?: string; error?: string }).message ||
-        (data as { error?: string }).error ||
-        "Failed to delete registration",
-    );
+  const data = (await parseJsonResponse(res)) as { success?: boolean; message?: string; error?: string };
   return data as { success: true };
 }
 
@@ -899,7 +929,7 @@ export type WebinarCoupon = {
 
 export async function fetchWebinarCoupons() {
   const res = await fetch(`${API_BASE}/api/admin/webinar-coupons`, { headers: getHeaders(true) });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   const coupons = (flat.coupons ?? flat.data) as WebinarCoupon[];
@@ -919,7 +949,7 @@ export async function upsertWebinarCoupon(body: {
     headers: getHeaders(true),
     body: JSON.stringify(body),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   const coupon = flat.coupon as WebinarCoupon;
@@ -932,9 +962,7 @@ export async function deleteWebinarCoupon(code: string) {
     method: "DELETE",
     headers: getHeaders(true),
   });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok)
-    throw new Error((data as { message?: string; error?: string }).message || (data as { error?: string }).error || "Failed to delete webinar coupon");
+  const data = (await parseJsonResponse(res)) as { success?: boolean };
   return data as { success: true };
 }
 
@@ -942,7 +970,7 @@ export async function fetchWebinarPackages() {
   const res = await fetch(`${API_BASE}/api/admin/webinar-settings/packages`, {
     headers: getHeaders(true),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   return {
@@ -958,7 +986,7 @@ export async function updateWebinarPackages(packages: WebinarPackage[]) {
     headers: getHeaders(true),
     body: JSON.stringify({ packages }),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   return {
@@ -972,7 +1000,7 @@ export async function fetchWebinarEventSettings() {
   const res = await fetch(`${API_BASE}/api/admin/webinar-settings/event`, {
     headers: getHeaders(true),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   return {
@@ -987,7 +1015,7 @@ export async function updateWebinarEventSettings(body: WebinarEventSettings) {
     headers: getHeaders(true),
     body: JSON.stringify(body),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   return {
@@ -1015,7 +1043,7 @@ export type WebinarEventCard = {
 
 export async function fetchWebinarEvents() {
   const res = await fetch(`${API_BASE}/api/admin/webinar-events`, { headers: getHeaders(true) });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   const items = (flat.items ?? flat.data) as WebinarEventCard[];
@@ -1042,7 +1070,7 @@ export async function createWebinarEvent(body: {
     headers: getHeaders(true),
     body: JSON.stringify(body),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   return {
@@ -1069,7 +1097,7 @@ export async function updateWebinarEvent(
     headers: getHeaders(true),
     body: JSON.stringify(body),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   return { success: true as const, event: flat.event as WebinarEventCard, isCurrent: !!flat.isCurrent };
@@ -1080,7 +1108,7 @@ export async function activateWebinarEvent(id: string) {
     method: "POST",
     headers: getHeaders(true),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   return {
@@ -1096,7 +1124,7 @@ export async function closeWebinarRegistration(id: string) {
     method: "POST",
     headers: getHeaders(true),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   return {
@@ -1112,7 +1140,7 @@ export type FAQItem = { _id: string; question: string; answer: string; order: nu
 
 export async function fetchFaqs() {
   const res = await fetch(`${API_BASE}/api/admin/faq`, { headers: getHeaders(true) });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const list = readArrayData(unwrapBackendSuccess(raw)) as FAQItem[];
   return { success: true as const, data: list };
@@ -1124,7 +1152,7 @@ export async function addFaq(body: { question: string; answer: string; order?: n
     headers: getHeaders(true),
     body: JSON.stringify(body),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   const doc = flat.data as FAQItem;
@@ -1138,7 +1166,7 @@ export async function updateFaq(id: string, body: { question?: string; answer?: 
     headers: getHeaders(true),
     body: JSON.stringify(body),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   const doc = flat.data as FAQItem;
@@ -1151,7 +1179,7 @@ export async function deleteFaq(id: string) {
     method: "DELETE",
     headers: getHeaders(true),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   return unwrapBackendSuccess(raw);
 }
@@ -1183,7 +1211,7 @@ export async function sendAdminPush(body: {
     headers: getHeaders(true),
     body: JSON.stringify(body),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   const summary = flat.data as
@@ -1209,7 +1237,7 @@ export async function fetchAdminNotifications(params?: { page?: number; limit?: 
   const res = await fetch(`${API_BASE}/api/admin/notifications${qs ? `?${qs}` : ""}`, {
     headers: getHeaders(true),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   const broadcasts = flat.broadcasts as PushBroadcastRow[] | undefined;
@@ -1266,7 +1294,7 @@ export type AdminStoreOrder = {
 
 export async function fetchStoreCategories() {
   const res = await fetch(`${API_BASE}/api/admin/store/categories`, { headers: getHeaders(true) });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   const items = (flat.items ?? flat.data) as AdminStoreCategory[] | undefined;
@@ -1286,7 +1314,7 @@ export async function createStoreCategory(body: {
     headers: getHeaders(true),
     body: JSON.stringify(body),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   return { success: true as const, item: flat.item as AdminStoreCategory };
@@ -1298,7 +1326,7 @@ export async function updateStoreCategory(id: string, body: Partial<Omit<AdminSt
     headers: getHeaders(true),
     body: JSON.stringify(body),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   return { success: true as const, item: flat.item as AdminStoreCategory };
@@ -1309,7 +1337,7 @@ export async function deleteStoreCategory(id: string) {
     method: "DELETE",
     headers: getHeaders(true),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   return { success: true as const };
 }
@@ -1334,7 +1362,7 @@ export async function fetchStoreProducts(params?: { page?: number; limit?: numbe
   const res = await fetch(`${API_BASE}/api/admin/store/products${qs ? `?${qs}` : ""}`, {
     headers: getHeaders(true),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   return {
@@ -1361,7 +1389,7 @@ export async function createStoreProduct(body: {
     headers: getHeaders(true),
     body: JSON.stringify(body),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   return { success: true as const, item: flat.item as AdminStoreProduct };
@@ -1373,7 +1401,7 @@ export async function updateStoreProduct(id: string, body: Record<string, unknow
     headers: getHeaders(true),
     body: JSON.stringify(body),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   return { success: true as const, item: flat.item as AdminStoreProduct };
@@ -1384,7 +1412,7 @@ export async function deleteStoreProduct(id: string) {
     method: "DELETE",
     headers: getHeaders(true),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   return { success: true as const };
 }
@@ -1414,7 +1442,7 @@ export async function fetchStoreOrders(params?: { page?: number; limit?: number;
   const res = await fetch(`${API_BASE}/api/admin/store/orders${qs ? `?${qs}` : ""}`, {
     headers: getHeaders(true),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   return {
@@ -1433,7 +1461,7 @@ export async function updateStoreOrderStatus(
     headers: getHeaders(true),
     body: JSON.stringify({ status }),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   const flat = unwrapBackendSuccess(raw);
   return { success: true as const, item: flat.item as AdminStoreOrder };
 }
@@ -1442,7 +1470,7 @@ export async function updateStoreOrderStatus(
 
 export async function fetchAdminStaff() {
   const res = await fetch(`${API_BASE}/api/admin/staff`, { headers: getHeaders(true) });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   const data = (Array.isArray(flat.data) ? flat.data : Array.isArray(flat.items) ? flat.items : []) as AdminUser[];
@@ -1462,7 +1490,7 @@ export async function createAdminStaff(body: {
     headers: getHeaders(true),
     body: JSON.stringify(body),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   return { success: true as const, data: flat.data as AdminUser };
@@ -1483,7 +1511,7 @@ export async function updateAdminStaff(
     headers: getHeaders(true),
     body: JSON.stringify(body),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   return { success: true as const, data: flat.data as AdminUser };
@@ -1494,7 +1522,7 @@ export async function deleteAdminStaff(id: string) {
     method: "DELETE",
     headers: getHeaders(true),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   return unwrapBackendSuccess(raw);
 }
@@ -1526,7 +1554,7 @@ export async function fetchKnowledgeBase(params?: { page?: number; limit?: numbe
   if (params?.category != null && params.category.trim()) sp.set("category", params.category.trim());
   const qs = sp.toString();
   const res = await fetch(`${API_BASE}/api/admin/knowledge-base${qs ? `?${qs}` : ""}`, { headers: getHeaders(true) });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   return {
@@ -1542,7 +1570,7 @@ export async function createKnowledgeBaseItem(body: { title: string; content: st
     headers: getHeaders(true),
     body: JSON.stringify(body),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   return { success: true as const, data: flat.data as KnowledgeBaseItem };
@@ -1554,7 +1582,7 @@ export async function testRagQuery(query: string) {
     headers: getHeaders(true),
     body: JSON.stringify({ query }),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   return {
@@ -1570,7 +1598,7 @@ export async function deleteKnowledgeBaseItem(id: string) {
     method: "DELETE",
     headers: getHeaders(true),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   return unwrapBackendSuccess(raw);
 }
@@ -1599,7 +1627,7 @@ export async function fetchRewardsLeaderboard(params?: { page?: number; limit?: 
   if (params?.limit != null) sp.set("limit", String(params.limit));
   const qs = sp.toString();
   const res = await fetch(`${API_BASE}/api/admin/rewards/leaderboard${qs ? `?${qs}` : ""}`, { headers: getHeaders(true) });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   return {
@@ -1615,7 +1643,7 @@ export async function grantUserPoints(body: { userId: string; points: number; de
     headers: getHeaders(true),
     body: JSON.stringify(body),
   });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   return unwrapBackendSuccess(raw);
 }
@@ -1636,7 +1664,7 @@ export type PlatformAnalytics = {
 
 export async function fetchPlatformAnalytics() {
   const res = await fetch(`${API_BASE}/api/admin/analytics/overview`, { headers: getHeaders(true) });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   return { success: true as const, data: (flat.data ?? flat) as PlatformAnalytics };
@@ -1644,7 +1672,7 @@ export async function fetchPlatformAnalytics() {
 
 export async function fetchMoodTrends() {
   const res = await fetch(`${API_BASE}/api/admin/analytics/mood-trends`, { headers: getHeaders(true) });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   return {
@@ -1677,7 +1705,7 @@ export async function fetchAuditLogs(params?: { page?: number; limit?: number; s
   if (params?.search != null && params.search.trim()) sp.set("search", params.search.trim());
   const qs = sp.toString();
   const res = await fetch(`${API_BASE}/api/admin/audit-logs${qs ? `?${qs}` : ""}`, { headers: getHeaders(true) });
-  const raw = await res.json();
+  const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
   return {

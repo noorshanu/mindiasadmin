@@ -13,6 +13,7 @@ export default function SignUpForm() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [signupSecret, setSignupSecret] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { login } = useAuth();
@@ -34,7 +35,8 @@ export default function SignUpForm() {
       const { token, user } = await adminSignup(
         email.trim(),
         password,
-        name.trim() || undefined
+        name.trim() || undefined,
+        signupSecret.trim() || undefined,
       );
       login(token, user);
       navigate("/", { replace: true });
@@ -63,7 +65,7 @@ export default function SignUpForm() {
               Admin Sign Up
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Create an admin account. Anyone who signs up here will be an admin.
+              Create an admin account. Requires a signup secret when enabled on the server.
             </p>
           </div>
           <div>
@@ -114,6 +116,15 @@ export default function SignUpForm() {
                       )}
                     </span>
                   </div>
+                </div>
+                <div>
+                  <Label>Signup secret</Label>
+                  <Input
+                    type="password"
+                    placeholder="Matches backend ADMIN_SIGNUP_SECRET"
+                    value={signupSecret}
+                    onChange={(e) => setSignupSecret(e.target.value)}
+                  />
                 </div>
                 <div className="flex items-center gap-3">
                   <Checkbox

@@ -6,8 +6,10 @@ import {
   fetchRestrictedUsers,
   fetchModerationEvents,
   unrestrictUserChat,
+  updateModerationEvent,
   type AdminUser,
   type ModerationEvent,
+  type ModerationEventStatus,
 } from "../lib/api";
 import Button from "../components/ui/button/Button";
 
@@ -29,6 +31,7 @@ export default function RestrictedUsers() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [unrestrictingId, setUnrestrictingId] = useState<string | null>(null);
+  const [updatingEventId, setUpdatingEventId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -50,6 +53,19 @@ export default function RestrictedUsers() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const handleModerationStatus = async (eventId: string, status: ModerationEventStatus) => {
+    setUpdatingEventId(eventId);
+    setError(null);
+    try {
+      await updateModerationEvent(eventId, { status });
+      setEvents((prev) => prev.filter((ev) => ev._id !== eventId));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to update moderation event");
+    } finally {
+      setUpdatingEventId(null);
+    }
+  };
 
   const handleUnrestrict = async (id: string, email?: string) => {
     if (
@@ -247,22 +263,38 @@ export default function RestrictedUsers() {
                             : "—"}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          {uid ? (
+                          <div className="flex flex-col gap-1">
+                            {uid ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleUnrestrict(uid, userLabelFromEvent(event))
+                                }
+                                disabled={unrestrictingId === uid}
+                                className="text-left text-sm font-medium text-green-600 hover:text-green-700 disabled:opacity-50 dark:text-green-400"
+                              >
+                                {unrestrictingId === uid
+                                  ? "Unrestricting…"
+                                  : "Unrestrict"}
+                              </button>
+                            ) : null}
                             <button
                               type="button"
-                              onClick={() =>
-                                handleUnrestrict(uid, userLabelFromEvent(event))
-                              }
-                              disabled={unrestrictingId === uid}
-                              className="text-sm font-medium text-green-600 hover:text-green-700 disabled:opacity-50 dark:text-green-400"
+                              onClick={() => void handleModerationStatus(event._id, "reviewed")}
+                              disabled={updatingEventId === event._id}
+                              className="text-left text-sm text-brand-500 hover:underline disabled:opacity-50"
                             >
-                              {unrestrictingId === uid
-                                ? "Unrestricting…"
-                                : "Unrestrict"}
+                              {updatingEventId === event._id ? "Updating…" : "Mark reviewed"}
                             </button>
-                          ) : (
-                            "—"
-                          )}
+                            <button
+                              type="button"
+                              onClick={() => void handleModerationStatus(event._id, "dismissed")}
+                              disabled={updatingEventId === event._id}
+                              className="text-left text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50 dark:text-gray-400"
+                            >
+                              Dismiss
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );

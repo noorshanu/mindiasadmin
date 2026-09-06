@@ -6,7 +6,7 @@ import Input from "../form/input/InputField";
 import Checkbox from "../form/input/Checkbox";
 import Button from "../ui/button/Button";
 import { useAuth } from "../../context/AuthContext";
-import { adminLogin } from "../../lib/api";
+import { adminLogin, ADMIN_SIGNUP_ENABLED, API_BASE } from "../../lib/api";
 
 export default function SignInForm() {
   const [showPassword, setShowPassword] = useState(false);
@@ -31,7 +31,12 @@ export default function SignInForm() {
       login(token, user);
       navigate("/", { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Sign in failed.");
+      const msg = err instanceof Error ? err.message : "Sign in failed."
+      if (msg.includes("HTML instead of JSON") || msg.includes("Failed to fetch")) {
+        setError(`${msg} API: ${API_BASE}`)
+      } else {
+        setError(msg)
+      }
     } finally {
       setLoading(false);
     }
@@ -119,17 +124,19 @@ export default function SignInForm() {
               </div>
             </form>
 
-            <div className="mt-5">
-              <p className="text-sm font-normal text-center text-gray-700 dark:text-gray-400 sm:text-start">
-                Don&apos;t have an admin account?{" "}
-                <Link
-                  to="/signup"
-                  className="text-brand-500 hover:text-brand-600 dark:text-brand-400"
-                >
-                  Sign Up
-                </Link>
-              </p>
-            </div>
+            {ADMIN_SIGNUP_ENABLED ? (
+              <div className="mt-5">
+                <p className="text-sm font-normal text-center text-gray-700 dark:text-gray-400 sm:text-start">
+                  Don&apos;t have an admin account?{" "}
+                  <Link
+                    to="/signup"
+                    className="text-brand-500 hover:text-brand-600 dark:text-brand-400"
+                  >
+                    Sign Up
+                  </Link>
+                </p>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>

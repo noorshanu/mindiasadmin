@@ -12,8 +12,12 @@ export default function ProtectedRoute({ children, permission }: ProtectedRouteP
 
   if (!checked || loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-white dark:bg-gray-900">
-        <div className="text-gray-500 dark:text-gray-400">Loading...</div>
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-white dark:bg-gray-900">
+        <div
+          className="h-8 w-8 animate-spin rounded-full border-2 border-brand-500 border-t-transparent"
+          aria-hidden
+        />
+        <p className="text-sm text-gray-500 dark:text-gray-400">Loading admin session…</p>
       </div>
     );
   }
@@ -34,6 +38,9 @@ export default function ProtectedRoute({ children, permission }: ProtectedRouteP
       }
       if (user.adminRole === "webinar_manager" && !userPerms.includes("manage_webinar")) {
         userPerms.push("manage_webinar");
+      }
+      if (user.adminRole === "support_manager" && !userPerms.includes("manage_support")) {
+        userPerms.push("manage_support");
       }
       if (user.canAddUsers && !userPerms.includes("manage_admins")) {
         userPerms.push("manage_admins");

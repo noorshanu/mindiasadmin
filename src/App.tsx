@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router";
 import SignIn from "./pages/AuthPages/SignIn";
 import SignUp from "./pages/AuthPages/SignUp";
 import NotFound from "./pages/OtherPage/NotFound";
@@ -34,6 +34,7 @@ import KnowledgeBaseManagement from "./pages/KnowledgeBaseManagement";
 import RewardsManagement from "./pages/RewardsManagement";
 import AnalyticsDashboard from "./pages/AnalyticsDashboard";
 import AuditLogs from "./pages/AuditLogs";
+import { ADMIN_SIGNUP_ENABLED } from "./lib/api";
 
 export default function App() {
   return (
@@ -203,9 +204,13 @@ export default function App() {
           <Route
             path="/signup"
             element={
-              <GuestRoute>
-                <SignUp />
-              </GuestRoute>
+              ADMIN_SIGNUP_ENABLED ? (
+                <GuestRoute>
+                  <SignUp />
+                </GuestRoute>
+              ) : (
+                <Navigate to="/signin" replace />
+              )
             }
           />
 
