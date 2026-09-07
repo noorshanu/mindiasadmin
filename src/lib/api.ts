@@ -1679,6 +1679,62 @@ export async function fetchMoodTrends() {
   };
 }
 
+export type AiUsageSummary = {
+  totalRequests: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalTokens: number;
+  totalEstimatedCostUsd: number;
+  usersWithAiUsage: number;
+  avgTokensPerUser: number;
+  avgCostPerUser: number;
+  avgTokensPerRequest: number;
+  byFeature: { feature: string; requests: number; totalTokens: number; estimatedCostUsd: number }[];
+  byProvider: { provider: string; model: string; requests: number; totalTokens: number; estimatedCostUsd: number }[];
+  timestamp: string;
+};
+
+export type AiUsageUserRow = {
+  userId: string;
+  email?: string;
+  username?: string;
+  phone?: string;
+  requests: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalTokens: number;
+  estimatedCostUsd: number;
+  lastUsedAt: string;
+};
+
+export async function fetchAiUsageSummary() {
+  const res = await fetch(`${API_BASE}/api/admin/analytics/ai-usage/summary`, {
+    headers: getHeaders(true),
+  });
+  const raw = await parseJsonResponse(res);
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  return { success: true as const, data: (flat.data ?? flat) as AiUsageSummary };
+}
+
+export async function fetchAiUsageByUser(params?: { page?: number; limit?: number }) {
+  const sp = new URLSearchParams();
+  if (params?.page != null) sp.set("page", String(params.page));
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  const qs = sp.toString();
+  const res = await fetch(`${API_BASE}/api/admin/analytics/ai-usage/users${qs ? `?${qs}` : ""}`, {
+    headers: getHeaders(true),
+  });
+  const raw = await parseJsonResponse(res);
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  return {
+    success: true as const,
+    data: (flat.data ?? []) as AiUsageUserRow[],
+    pagination: flat.pagination as PaginationMeta,
+  };
+}
+
 // ——— System Audit Trail —————————————————————————————————─────────────────
 
 export type AuditLogRow = {
