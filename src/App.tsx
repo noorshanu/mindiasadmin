@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router"
+import { Routes, Route, Navigate } from "react-router"
 import SignIn from "./pages/AuthPages/SignIn"
 import SignUp from "./pages/AuthPages/SignUp"
 import NotFound from "./pages/OtherPage/NotFound"
@@ -26,7 +26,7 @@ import { ADMIN_SIGNUP_ENABLED } from "./lib/api"
 
 export default function App() {
   return (
-    <Router>
+    <>
       <ScrollToTop />
       <Routes>
         <Route
@@ -36,7 +36,7 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route index path="/" element={<Home />} />
+          <Route index element={<Home />} />
 
           <Route
             path="/ai/knowledge-base"
@@ -181,6 +181,6 @@ export default function App() {
 
         <Route path="*" element={<NotFound />} />
       </Routes>
-    </Router>
+    </>
   )
 }

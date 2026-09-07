@@ -1,5 +1,4 @@
 import { Component, type ErrorInfo, type ReactNode } from "react"
-import { Link } from "react-router"
 
 type ErrorBoundaryProps = {
   children: ReactNode
@@ -50,12 +49,12 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
             >
               Reload dashboard
             </button>
-            <Link
-              to="/signin"
+            <a
+              href="/signin"
               className="inline-flex items-center justify-center rounded-xl border border-gray-300 px-5 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
             >
               Go to sign in
-            </Link>
+            </a>
           </div>
         </div>
       </div>
