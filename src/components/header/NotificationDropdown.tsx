@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
-import { fetchSupportMessages, type SupportMessage } from "../../lib/api";
+import { fetchSupportMessages, ensureArray, type SupportMessage } from "../../lib/api";
 
 function formatTimeAgo(dateStr: string): string {
   const d = new Date(dateStr);
@@ -30,8 +30,9 @@ export default function NotificationDropdown() {
     setError(null);
     try {
       const res = await fetchSupportMessages({ page: 1, limit: 10 });
-      setMessages(res.data);
-      const hasPending = res.data.some((m) => m.status === "pending");
+      const list = ensureArray<SupportMessage>(res.data);
+      setMessages(list);
+      const hasPending = list.some((m) => m.status === "pending");
       setNotifying(hasPending);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load");

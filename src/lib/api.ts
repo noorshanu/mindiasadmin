@@ -161,6 +161,19 @@ function readArrayData(flat: Record<string, unknown>): unknown[] {
   return [];
 }
 
+/** Coerce unknown API values to arrays before `.map` in UI. */
+export function ensureArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function pickObjectPayload(flat: Record<string, unknown>): Record<string, unknown> {
+  const nested = flat.data;
+  if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+    return nested as Record<string, unknown>;
+  }
+  return flat;
+}
+
 function getToken(): string | null {
   return localStorage.getItem("admin_token");
 }
@@ -1670,11 +1683,14 @@ export async function fetchMoodTrends() {
   const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
+  const payload = pickObjectPayload(flat);
   return {
     success: true as const,
-    data: (flat.data ?? flat) as {
-      totalCheckIns: number;
-      moodBreakdown: { mood: string; count: number; percentage: number }[];
+    data: {
+      totalCheckIns: Number(payload.totalCheckIns ?? 0),
+      moodBreakdown: ensureArray<{ mood: string; count: number; percentage: number }>(
+        payload.moodBreakdown,
+      ),
     },
   };
 }
@@ -1714,7 +1730,24 @@ export async function fetchAiUsageSummary() {
   const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
-  return { success: true as const, data: (flat.data ?? flat) as AiUsageSummary };
+  const payload = pickObjectPayload(flat);
+  return {
+    success: true as const,
+    data: {
+      totalRequests: Number(payload.totalRequests ?? 0),
+      totalInputTokens: Number(payload.totalInputTokens ?? 0),
+      totalOutputTokens: Number(payload.totalOutputTokens ?? 0),
+      totalTokens: Number(payload.totalTokens ?? 0),
+      totalEstimatedCostUsd: Number(payload.totalEstimatedCostUsd ?? 0),
+      usersWithAiUsage: Number(payload.usersWithAiUsage ?? 0),
+      avgTokensPerUser: Number(payload.avgTokensPerUser ?? 0),
+      avgCostPerUser: Number(payload.avgCostPerUser ?? 0),
+      avgTokensPerRequest: Number(payload.avgTokensPerRequest ?? 0),
+      byFeature: ensureArray<AiUsageSummary["byFeature"][number]>(payload.byFeature),
+      byProvider: ensureArray<AiUsageSummary["byProvider"][number]>(payload.byProvider),
+      timestamp: typeof payload.timestamp === "string" ? payload.timestamp : new Date().toISOString(),
+    } satisfies AiUsageSummary,
+  };
 }
 
 export async function fetchAiUsageByUser(params?: { page?: number; limit?: number }) {
@@ -1728,10 +1761,12 @@ export async function fetchAiUsageByUser(params?: { page?: number; limit?: numbe
   const raw = await parseJsonResponse(res);
   throwIfFailed(res, raw);
   const flat = unwrapBackendSuccess(raw);
+  const rows = readArrayData(flat);
+  const pagination = flat.pagination as PaginationMeta | undefined;
   return {
     success: true as const,
-    data: (flat.data ?? []) as AiUsageUserRow[],
-    pagination: flat.pagination as PaginationMeta,
+    data: rows as AiUsageUserRow[],
+    pagination: pagination ?? { page: 1, limit: 20, total: rows.length, totalPages: 1 },
   };
 }
 

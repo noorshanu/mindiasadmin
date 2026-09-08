@@ -28,11 +28,16 @@ type AuthContextValue = AuthState & {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
+const normalizeAdminUser = (user: AdminUser): AdminUser => ({
+  ...user,
+  permissions: Array.isArray(user.permissions) ? user.permissions : [],
+})
+
 const readStoredUser = (): AdminUser | null => {
   const stored = localStorage.getItem(USER_KEY)
   if (!stored) return null
   try {
-    return JSON.parse(stored) as AdminUser
+    return normalizeAdminUser(JSON.parse(stored) as AdminUser)
   } catch {
     return null
   }
@@ -61,10 +66,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const login = useCallback((token: string, user: AdminUser) => {
+    const normalized = normalizeAdminUser(user)
     localStorage.setItem(TOKEN_KEY, token)
-    localStorage.setItem(USER_KEY, JSON.stringify(user))
+    localStorage.setItem(USER_KEY, JSON.stringify(normalized))
     setState({
-      user,
+      user: normalized,
       token,
       loading: false,
       checked: true,
@@ -72,8 +78,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const setUser = useCallback((user: AdminUser | null) => {
-    setState((prev) => ({ ...prev, user }))
-    if (user) localStorage.setItem(USER_KEY, JSON.stringify(user))
+    const normalized = user ? normalizeAdminUser(user) : null
+    setState((prev) => ({ ...prev, user: normalized }))
+    if (normalized) localStorage.setItem(USER_KEY, JSON.stringify(normalized))
   }, [])
 
   useEffect(() => {
@@ -91,9 +98,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const { user } = await adminMe()
         if (cancelled) return
-        localStorage.setItem(USER_KEY, JSON.stringify(user))
+        localStorage.setItem(USER_KEY, JSON.stringify(normalizeAdminUser(user)))
         setState({
-          user,
+          user: normalizeAdminUser(user),
           token,
           loading: false,
           checked: true,

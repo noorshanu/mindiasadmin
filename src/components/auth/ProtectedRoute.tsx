@@ -29,7 +29,7 @@ export default function ProtectedRoute({ children, permission }: ProtectedRouteP
   if (permission && user) {
     const isSuper = !user.adminRole || user.adminRole === "super_admin";
     if (!isSuper) {
-      const userPerms = user.permissions || [];
+      const userPerms = Array.isArray(user.permissions) ? [...user.permissions] : [];
       if (user.adminRole === "content_manager" && !userPerms.includes("manage_content")) {
         userPerms.push("manage_content");
       }

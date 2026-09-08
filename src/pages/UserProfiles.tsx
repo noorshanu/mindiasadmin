@@ -96,7 +96,7 @@ export default function UserProfiles() {
               ))}
             </dl>
 
-            {user.permissions && user.permissions.length > 0 ? (
+            {Array.isArray(user.permissions) && user.permissions.length > 0 ? (
               <div className="border-t border-gray-100 px-6 py-5 dark:border-gray-800">
                 <p className="mb-3 text-xs font-medium uppercase tracking-wide text-gray-500">Permissions</p>
                 <div className="flex flex-wrap gap-2">

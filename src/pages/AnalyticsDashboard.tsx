@@ -10,6 +10,7 @@ import {
   fetchMoodTrends,
   fetchAiUsageSummary,
   fetchAiUsageByUser,
+  ensureArray,
   type PlatformAnalytics,
   type AiUsageSummary,
   type AiUsageUserRow,
@@ -53,7 +54,7 @@ export default function AnalyticsDashboard() {
       setStats(analyticsRes.data)
       setMoodData(moodRes.data)
       setAiUsage(aiSummaryRes.data)
-      setAiUsers(aiUsersRes.data)
+      setAiUsers(ensureArray<AiUsageUserRow>(aiUsersRes.data))
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load analytics")
     } finally {
@@ -167,7 +168,7 @@ export default function AnalyticsDashboard() {
               ) : null}
 
               {/* By feature */}
-              {aiUsage && aiUsage.byFeature.length > 0 ? (
+              {Array.isArray(aiUsage?.byFeature) && aiUsage.byFeature.length > 0 ? (
                 <div className="mt-6">
                   <h3 className="mb-3 text-sm font-semibold text-gray-800 dark:text-gray-200">Usage by feature</h3>
                   <div className="overflow-x-auto">
@@ -247,7 +248,9 @@ export default function AnalyticsDashboard() {
                 {moodData?.totalCheckIns ?? 0} check-ins total
               </p>
               <div className="space-y-4">
-                {moodData?.moodBreakdown.map((m) => (
+                {ensureArray<{ mood: string; count: number; percentage: number }>(
+                  moodData?.moodBreakdown,
+                ).map((m) => (
                   <div key={m.mood} className="space-y-1.5">
                     <div className="flex justify-between text-xs font-medium capitalize text-gray-700 dark:text-gray-300">
                       <span>{m.mood}</span>

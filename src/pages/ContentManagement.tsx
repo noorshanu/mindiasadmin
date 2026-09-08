@@ -36,6 +36,7 @@ import {
   updateSocial,
   uploadHomeHeroSlide,
   deleteHomeHeroSlide,
+  ensureArray,
   type TeamMember,
   type SocialSettings,
   type HomeHeroSlide,
@@ -218,8 +219,8 @@ export default function ContentManagement() {
       setVision(contentRes.vision || DEFAULT_VISION)
       setMission(contentRes.mission || DEFAULT_MISSION)
       setThought(typeof contentRes.thought === "string" ? contentRes.thought : DEFAULT_THOUGHT)
-      setHomeHeroSlides(contentRes.homeHeroSlides ?? [])
-      const teamData = teamRes.data || []
+      setHomeHeroSlides(ensureArray<HomeHeroSlide>(contentRes.homeHeroSlides))
+      const teamData = ensureArray<TeamMember>(teamRes.data)
       setTeam(teamData)
       originalOrderRef.current = teamData.map((m) => m._id)
       setOrderChanged(false)
@@ -342,8 +343,8 @@ export default function ContentManagement() {
     try {
       const orderedIds = team.map((m) => m._id)
       const res = await reorderTeam(orderedIds)
-      setTeam(res.data)
-      originalOrderRef.current = res.data.map((m) => m._id)
+      setTeam(ensureArray<TeamMember>(res.data))
+      originalOrderRef.current = ensureArray<TeamMember>(res.data).map((m) => m._id)
       setOrderChanged(false)
       showSuccess("Team order saved — live on website")
     } catch (e) {
@@ -367,7 +368,7 @@ export default function ContentManagement() {
     setError(null)
     try {
       const res = await updateContent({ vision, mission, thought })
-      setHomeHeroSlides(res.homeHeroSlides)
+      setHomeHeroSlides(ensureArray<HomeHeroSlide>(res.homeHeroSlides))
       showSuccess("Vision, mission & thought saved")
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save")
@@ -396,7 +397,7 @@ export default function ContentManagement() {
     try {
       const res = await uploadHomeHeroSlide(file, heroAlt || undefined)
       if (Array.isArray(res.homeHeroSlides)) {
-        setHomeHeroSlides(res.homeHeroSlides)
+        setHomeHeroSlides(ensureArray<HomeHeroSlide>(res.homeHeroSlides))
       } else if (res.slide) {
         setHomeHeroSlides((prev) => {
           const exists = prev.some((s) => s._id === res.slide!._id || s.imageUrl === res.slide!.imageUrl)
@@ -419,7 +420,7 @@ export default function ContentManagement() {
     try {
       const res = await deleteHomeHeroSlide(deleteHeroTarget._id)
       if (Array.isArray(res.homeHeroSlides)) {
-        setHomeHeroSlides(res.homeHeroSlides)
+        setHomeHeroSlides(ensureArray<HomeHeroSlide>(res.homeHeroSlides))
       } else {
         setHomeHeroSlides((prev) => prev.filter((s) => s._id !== deleteHeroTarget._id))
       }

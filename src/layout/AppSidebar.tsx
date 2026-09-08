@@ -180,7 +180,7 @@ export default function AppSidebar() {
       const isSuper = !user.adminRole || user.adminRole === "super_admin";
       if (isSuper) return true;
 
-      const perms = [...(user.permissions || [])];
+      const perms = Array.isArray(user.permissions) ? [...user.permissions] : [];
       if (user.adminRole === "content_manager" && !perms.includes("manage_content")) perms.push("manage_content");
       if (user.adminRole === "user_manager" && !perms.includes("manage_users")) perms.push("manage_users");
       if (user.adminRole === "webinar_manager" && !perms.includes("manage_webinar")) perms.push("manage_webinar");

@@ -255,7 +255,7 @@ export default function AdminStaffManagement() {
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
                   {staff.map((member) => {
                     const isSuper = member.adminRole === "super_admin";
-                    const memberPerms = member.permissions || [];
+                    const memberPerms = Array.isArray(member.permissions) ? member.permissions : [];
 
                     const allowed = isSuper
                       ? MODULE_LIST
