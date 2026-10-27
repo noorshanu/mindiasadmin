@@ -1,5 +1,5 @@
 /** Live API by default. Override only if you need a different backend. */
-export const API_BASE = (import.meta.env.VITE_API_BASE_URL || "https://api.mindsai.live")
+export const API_BASE = (import.meta.env.VITE_API_BASE_URL || "https://api.mindsai.in")
   .replace(/\/api\/?$/, "")
   .replace(/\/$/, "");
 
