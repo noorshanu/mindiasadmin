@@ -438,6 +438,28 @@ export async function fetchUserActivityHistory(userId: string, params?: { limit?
   return { success: true as const, data: rows };
 }
 
+export async function createUser(body: {
+  email?: string;
+  password: string;
+  username?: string;
+  fullName?: string;
+  phone?: string;
+  occupation?: string;
+  gender?: "male" | "female" | "other";
+}) {
+  const res = await fetch(`${API_BASE}/api/admin/users`, {
+    method: "POST",
+    headers: getHeaders(true),
+    body: JSON.stringify(body),
+  });
+  const raw = await parseJsonResponse(res);
+  throwIfFailed(res, raw);
+  const flat = unwrapBackendSuccess(raw);
+  const user = flat.data as AdminUser;
+  if (!user) throw new Error("Failed to create user");
+  return { success: true as const, data: user, message: flat.message as string | undefined };
+}
+
 export async function updateUser(
   id: string,
   body: {

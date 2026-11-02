@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import PageMeta from "../components/common/PageMeta";
 import {
   fetchUsers,
+  createUser,
   updateUser,
   deleteUser,
   unrestrictUserChat,
@@ -10,6 +11,18 @@ import {
 } from "../lib/api";
 import Button from "../components/ui/button/Button";
 import Input from "../components/form/input/InputField";
+import Label from "../components/form/Label";
+import { AdminDialog } from "../components/ui/modal/AdminDialog";
+
+const emptyCreateForm = {
+  email: "",
+  password: "",
+  username: "",
+  fullName: "",
+  phone: "",
+  occupation: "",
+  gender: "" as "" | "male" | "female" | "other",
+};
 
 export default function UserManagement() {
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -23,6 +36,7 @@ export default function UserManagement() {
   const [searchInput, setSearchInput] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [softDeletingId, setSoftDeletingId] = useState<string | null>(null);
@@ -32,6 +46,9 @@ export default function UserManagement() {
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [chatFilter, setChatFilter] = useState<"all" | "restricted" | "ok">("all");
   const [unrestrictingId, setUnrestrictingId] = useState<string | null>(null);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [createForm, setCreateForm] = useState(emptyCreateForm);
+  const [creating, setCreating] = useState(false);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -139,6 +156,55 @@ export default function UserManagement() {
     }
   };
 
+  const openAddModal = () => {
+    setCreateForm(emptyCreateForm);
+    setError(null);
+    setSuccess(null);
+    setIsAddModalOpen(true);
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const email = createForm.email.trim();
+    const phone = createForm.phone.trim();
+    if (!email && !phone) {
+      setError("Email or phone is required");
+      return;
+    }
+    if (createForm.password.length < 6) {
+      setError("Password must be at least 6 characters");
+      return;
+    }
+
+    setCreating(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await createUser({
+        email: email || undefined,
+        password: createForm.password,
+        username: createForm.username.trim() || undefined,
+        fullName: createForm.fullName.trim() || undefined,
+        phone: phone || undefined,
+        occupation: createForm.occupation.trim() || undefined,
+        gender: createForm.gender || undefined,
+      });
+      setUsers((prev) => [res.data, ...prev]);
+      setPagination((prev) => ({
+        ...prev,
+        total: prev.total + 1,
+        totalPages: Math.max(1, Math.ceil((prev.total + 1) / prev.limit)),
+      }));
+      setSuccess(res.message || "User created successfully");
+      setIsAddModalOpen(false);
+      setCreateForm(emptyCreateForm);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create user");
+    } finally {
+      setCreating(false);
+    }
+  };
+
   return (
     <>
       <PageMeta
@@ -151,6 +217,9 @@ export default function UserManagement() {
             User Management
           </h1>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <Button type="button" size="sm" onClick={openAddModal}>
+              + Add User
+            </Button>
             <form onSubmit={handleSearch} className="flex gap-2">
               <Input
                 type="text"
@@ -209,6 +278,11 @@ export default function UserManagement() {
         {error && (
           <div className="p-4 text-sm text-red-600 bg-red-50 rounded-lg dark:bg-red-900/20 dark:text-red-400">
             {error}
+          </div>
+        )}
+        {success && (
+          <div className="p-4 text-sm text-emerald-700 bg-emerald-50 rounded-lg dark:bg-emerald-900/20 dark:text-emerald-300">
+            {success}
           </div>
         )}
 
@@ -386,6 +460,97 @@ export default function UserManagement() {
           )}
         </div>
       </div>
+
+      <AdminDialog
+        open={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        title="Add custom user"
+        description="Create an app user account without the normal signup OTP flow. Email is verified automatically."
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={() => setIsAddModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" form="add-user-form" disabled={creating}>
+              {creating ? "Creating..." : "Create User"}
+            </Button>
+          </>
+        }
+      >
+        <form id="add-user-form" onSubmit={handleCreateUser} className="space-y-4">
+          <div>
+            <Label>Full Name</Label>
+            <Input
+              value={createForm.fullName}
+              onChange={(e) => setCreateForm((prev) => ({ ...prev, fullName: e.target.value }))}
+              placeholder="e.g. Jane Doe"
+            />
+          </div>
+          <div>
+            <Label>Email</Label>
+            <Input
+              type="email"
+              value={createForm.email}
+              onChange={(e) => setCreateForm((prev) => ({ ...prev, email: e.target.value }))}
+              placeholder="jane@example.com"
+            />
+          </div>
+          <div>
+            <Label>Password</Label>
+            <Input
+              type="password"
+              value={createForm.password}
+              onChange={(e) => setCreateForm((prev) => ({ ...prev, password: e.target.value }))}
+              placeholder="At least 6 characters"
+            />
+          </div>
+          <div>
+            <Label>Username (optional)</Label>
+            <Input
+              value={createForm.username}
+              onChange={(e) => setCreateForm((prev) => ({ ...prev, username: e.target.value }))}
+              placeholder="jane_doe"
+            />
+          </div>
+          <div>
+            <Label>Phone (optional)</Label>
+            <Input
+              value={createForm.phone}
+              onChange={(e) => setCreateForm((prev) => ({ ...prev, phone: e.target.value }))}
+              placeholder="+91 98765 43210"
+            />
+          </div>
+          <div>
+            <Label>Occupation (optional)</Label>
+            <Input
+              value={createForm.occupation}
+              onChange={(e) => setCreateForm((prev) => ({ ...prev, occupation: e.target.value }))}
+              placeholder="e.g. Student"
+            />
+          </div>
+          <div>
+            <Label>Gender (optional)</Label>
+            <select
+              value={createForm.gender}
+              onChange={(e) =>
+                setCreateForm((prev) => ({
+                  ...prev,
+                  gender: e.target.value as "" | "male" | "female" | "other",
+                }))
+              }
+              className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+            >
+              <option value="">Not specified</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Provide at least an email or phone. Password is required so the user can sign in.
+          </p>
+        </form>
+      </AdminDialog>
     </>
   );
 }
