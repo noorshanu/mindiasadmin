@@ -25,7 +25,7 @@ async function readApiResponse(res: Response): Promise<unknown> {
       );
     }
     throw new Error(
-      `Server returned HTML instead of JSON (HTTP ${res.status}). Check VITE_API_BASE_URL — it must be your API host (e.g. https://api.mindsai.live), not the admin website URL.`,
+      `Server returned HTML instead of JSON (HTTP ${res.status}). Check VITE_API_BASE_URL — it must be your API host (e.g. https://api.mindsai.in), not the admin website URL.`,
     );
   }
   try {
@@ -395,6 +395,8 @@ export async function fetchUserMoodLogs(userId: string, params?: { limit?: numbe
 export type UserJournalEntryRow = {
   _id: string;
   mood: string;
+  title?: string;
+  prompt?: string;
   text: string;
   createdAt?: string;
   updatedAt?: string;
